@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* SHARED DESIGN TOKENS — owned by the Shell agent; everyone uses these via Tailwind
+   (e.g. bg-brand, text-ink-muted, border-line, text-tone-3). */
+@theme {
+  --color-brand: #16a34a;
+  --color-brand-dark: #15803d;
+  --color-brand-soft: #dcfce7;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-warn: #f59e0b;
+  --color-ink: #1f2937;
+  --color-ink-muted: #6b7280;
+  --color-surface: #ffffff;
+  --color-surface-2: #f3f4f6;
+  --color-line: #e5e7eb;
+  /* extra shell accents */
+  --color-gold: #facc15;
+  --color-gold-dark: #ca8a04;
+  --color-flame: #f97316;
+  --color-sky: #0ea5e9;
+  --color-sky-dark: #0284c7;
+  --color-sky-soft: #e0f2fe;
+  /* tone colours (Pleco-style): 1 red, 2 green, 3 blue, 4 purple, 5 grey */
+  --color-tone-1: #e11d48;
+  --color-tone-2: #16a34a;
+  --color-tone-3: #2563eb;
+  --color-tone-4: #9333ea;
+  --color-tone-5: #6b7280;
+  --font-sans: "Nunito", ui-rounded, system-ui, sans-serif;
+
+  --animate-bob: bob 1.4s ease-in-out infinite;
+  --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-sheet: sheet-up 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-fade: fade-in 0.2s ease-out both;
+  --animate-wiggle: wiggle 1.8s ease-in-out infinite;
+
+  @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+  @keyframes sheet-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
+  @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes wiggle { 0%, 100% { transform: rotate(0) } 10% { transform: rotate(-8deg) } 20% { transform: rotate(8deg) } 30% { transform: rotate(0) } }
+}
+:root { --tone-1: var(--color-tone-1); --tone-2: var(--color-tone-2); --tone-3: var(--color-tone-3); --tone-4: var(--color-tone-4); --tone-5: var(--color-tone-5); }
+
+html, body, #root { height: 100%; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: clip;
+  overscroll-behavior-y: none;
+}
+button { cursor: pointer; touch-action: manipulation; }
+button:disabled { cursor: default; }
+
+/* Safe-area helpers (iPhone notch / home indicator). */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.px-safe { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
+/* Chunky range slider */
+input[type="range"].slider { -webkit-appearance: none; appearance: none; height: 10px; border-radius: 999px; background: var(--color-line); outline: none; }
+input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 999px; background: var(--color-brand); border: 3px solid #fff; box-shadow: 0 2px 0 var(--color-brand-dark), 0 0 0 1px var(--color-brand-dark); }
+input[type="range"].slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 999px; background: var(--color-brand); border: 3px solid #fff; box-shadow: 0 2px 0 var(--color-brand-dark); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

@@ -1,0 +1,118 @@
+import type { UnitSpec } from '../builder'
+
+export const u03: UnitSpec = {
+  title: 'Siffror & ålder',
+  description: 'Räkna, säg hur gammal du är och ge ditt telefonnummer.',
+  emoji: '🔢',
+  lessons: [
+    {
+      title: 'Siffror 1–5',
+      words: [
+        ['ling', '零', 'líng', 'noll', 'num'],
+        ['yi', '一', 'yī', 'ett/en', 'num', 'Tonen på yī ändras ofta i tal (yí/yì) – pinyin skrivs ändå yī.'],
+        ['er', '二', 'èr', 'två', 'num'],
+        ['san', '三', 'sān', 'tre', 'num'],
+        ['si', '四', 'sì', 'fyra', 'num', 's som i "sol" – inte sh. Jämför shí (tio).'],
+        ['wu', '五', 'wǔ', 'fem', 'num'],
+      ],
+      sentences: [
+        ['yi er san', 'ett två tre'],
+        ['san si wu', 'tre fyra fem'],
+        ['wu si san er yi', 'fem fyra tre två ett'],
+        ['ling yi er', 'noll ett två'],
+      ],
+      tip: 'Sì (fyra) och shí (tio) är lätta att blanda ihop: s är ett vanligt s, sh uttalas med uppböjd tunga. Fyra anses otursamt i Kina eftersom det låter som sǐ (död).',
+    },
+    {
+      title: 'Siffror 6–10',
+      words: [
+        ['liu', '六', 'liù', 'sex', 'num'],
+        ['qi-seven', '七', 'qī', 'sju', 'num', 'q = "tj" som i tjugo.'],
+        ['ba', '八', 'bā', 'åtta', 'num', 'Åtta är lyckotalet i Kina.'],
+        ['jiu', '九', 'jiǔ', 'nio', 'num'],
+        ['shi-ten', '十', 'shí', 'tio', 'num'],
+      ],
+      sentences: [
+        ['liu qi-seven ba', 'sex sju åtta'],
+        ['shi-ten yi', 'elva'],
+        ['er shi-ten', 'tjugo'],
+        ['jiu shi-ten jiu', 'nittionio'],
+        ['san shi-ten wu', 'trettiofem'],
+      ],
+      tip: 'Kinesiska tal är logiska: 11 = shí yī (tio-ett), 20 = èr shí (två-tio), 35 = sān shí wǔ (tre-tio-fem). Kan du 1–10 kan du räkna till 99!',
+    },
+    {
+      title: 'Hur gammal är du?',
+      words: [
+        ['sui', '岁', 'suì', 'år (ålder)', 'measure'],
+        ['ji-how-many', '几', 'jǐ', 'hur många/vilken', 'pron', 'För små tal, t.ex. barns ålder.'],
+        ['duo', '多', 'duō', 'många/mycket/hur', 'adj'],
+        ['da-big', '大', 'dà', 'stor/gammal', 'adj'],
+        ['jin-nian', '今年', 'jīn nián', 'i år', 'noun'],
+      ],
+      sentences: [
+        ['ni jin-nian duo da-big ?', 'hur gammal är du'],
+        ['wo jin-nian er shi-ten wu sui', 'jag är tjugofem år/jag är tjugofem år i år/jag är tjugofem'],
+        ['ta-she ji-how-many sui ?', 'hur gammal är hon'],
+        ['wo san shi-ten sui', 'jag är trettio år/jag är trettio'],
+        ['ta-he ye san shi-ten sui', 'han är också trettio år/han är också trettio'],
+      ],
+      tip: 'Ålder sägs utan shì: "wǒ sān shí suì" (jag trettio år). Till vuxna frågar man "nǐ duō dà?", till barn "nǐ jǐ suì?". Till äldre personer finns ännu artigare former.',
+    },
+    {
+      title: 'Hur många?',
+      words: [
+        ['ge', '个', 'gè', '(måttord)/st', 'measure', 'Det vanligaste måttordet. Står mellan siffran och saken: yī gè rén.'],
+        ['you-have', '有', 'yǒu', 'ha/finnas', 'verb'],
+        ['liang', '两', 'liǎng', 'två (stycken)', 'num', 'Används före måttord: liǎng gè – inte èr gè.'],
+        ['mei', '没', 'méi', 'inte (ha)', 'adv', 'Nekar yǒu: méi yǒu = har inte / finns inte.'],
+        ['bai-hundred', '百', 'bǎi', 'hundra', 'num'],
+        ['dou', '都', 'dōu', 'alla/båda/allt', 'adv', 'Står före verbet: wǒ men dōu shì … = vi är alla …'],
+      ],
+      sentences: [
+        ['wo you-have liang ge peng-you', 'jag har två vänner/jag har två kompisar'],
+        ['ni you-have ji-how-many ge zhong-guo peng-you ?', 'hur många kinesiska vänner har du'],
+        ['wo mei you-have zhong-guo peng-you', 'jag har inga kinesiska vänner'],
+        ['ta-she you-have san ge xue-sheng', 'hon har tre elever/hon har tre studenter'],
+        ['yi bai-hundred', 'hundra/etthundra'],
+        ['ni-men dou shi-be xue-sheng ma-q ?', 'är ni alla studenter/är ni båda studenter/är ni studenter allihop'],
+        ['liang bai-hundred', 'tvåhundra'],
+      ],
+      tip: 'Måttord: på kinesiska måste det stå ett måttord mellan siffra och substantiv, ungefär som "två koppar kaffe" – fast alltid. Gè passar till det mesta. "Två" före måttord är liǎng: liǎng gè rén. Och nekande av yǒu är alltid méi yǒu, aldrig bù yǒu.',
+    },
+    {
+      title: 'Telefonnummer',
+      words: [
+        ['hao-ma', '号码', 'hào mǎ', 'nummer', 'noun'],
+        ['dian-hua', '电话', 'diàn huà', 'telefon', 'noun'],
+        ['shou-ji', '手机', 'shǒu jī', 'mobil/mobiltelefon', 'noun'],
+        ['duo-shao', '多少', 'duō shǎo', 'hur många/hur mycket', 'pron'],
+        ['yao-one', '幺', 'yāo', 'ett (i telefonnummer)', 'num', 'I telefonnummer säger man yāo i stället för yī, så det inte förväxlas med qī.'],
+        ['qian-thousand', '千', 'qiān', 'tusen', 'num'],
+        ['wan-10k', '万', 'wàn', 'tiotusen', 'num', 'Kineserna räknar i tiotusental: 50 000 = wǔ wàn.'],
+      ],
+      sentences: [
+        ['ni de shou-ji hao-ma shi-be duo-shao ?', 'vad är ditt mobilnummer/vad har du för mobilnummer'],
+        ['wo de hao-ma shi-be yao-one wu ling ba', 'mitt nummer är ett fem noll åtta'],
+        ['ni you-have shou-ji ma-q ?', 'har du mobil/har du en mobil'],
+        ['wo mei you-have dian-hua', 'jag har ingen telefon'],
+        ['duo-shao ren ?', 'hur många personer/hur många människor'],
+        ['san qian-thousand', 'tretusen'],
+        ['wu wan-10k', 'femtiotusen'],
+      ],
+      tip: 'Siffror i telefonnummer läses en och en, och ettan heter yāo. Stora tal räknas i wàn (10 000): 100 000 = shí wàn.',
+    },
+    {
+      title: 'Repetition: siffror',
+      kind: 'checkpoint',
+      sentences: [
+        ['wo de lao-shi si shi-ten sui', 'min lärare är fyrtio år/min lärare är fyrtio'],
+        ['ta-she you-have liang ge zhong-guo peng-you', 'hon har två kinesiska vänner'],
+        ['wo jin-nian shi-ten ba sui', 'jag är arton år/jag är arton'],
+        ['ni de dian-hua hao-ma shi-be duo-shao ?', 'vad är ditt telefonnummer/vad har du för telefonnummer'],
+        ['wo mei you-have shou-ji', 'jag har ingen mobil/jag har ingen mobiltelefon'],
+        ['ni-men you-have ji-how-many ge lao-shi ?', 'hur många lärare har ni'],
+      ],
+    },
+  ],
+}
