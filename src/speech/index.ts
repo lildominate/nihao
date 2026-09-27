@@ -27,14 +27,17 @@ export { MicButton } from './MicButton'
 
 export type { Tone }
 
-// iOS: speech + WebAudio must be unlocked inside a user gesture. Do it on the first interaction.
+// iOS: speech + WebAudio must be unlocked inside a user gesture. Speech once on the first
+// interaction; audio on EVERY interaction, because iOS suspends/interrupts the AudioContext
+// after TTS, backgrounding or calls — and resume() only works inside a gesture.
 if (typeof window !== 'undefined') {
-  const unlock = () => {
+  const unlockOnce = () => {
     unlockSpeech()
-    unlockAudio()
-    window.removeEventListener('pointerdown', unlock, true)
-    window.removeEventListener('keydown', unlock, true)
+    window.removeEventListener('pointerdown', unlockOnce, true)
+    window.removeEventListener('keydown', unlockOnce, true)
   }
-  window.addEventListener('pointerdown', unlock, true)
-  window.addEventListener('keydown', unlock, true)
+  window.addEventListener('pointerdown', unlockOnce, true)
+  window.addEventListener('keydown', unlockOnce, true)
+  window.addEventListener('pointerdown', unlockAudio, true)
+  window.addEventListener('keydown', unlockAudio, true)
 }

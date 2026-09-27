@@ -12,6 +12,11 @@ function getCtx(): Ctx | null {
     const AC: typeof AudioContext | undefined =
       window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AC) return null
+    // iOS 17+: Web Audio defaults to the "ambient" session, which the ring/silent switch mutes —
+    // so the learner heard the TTS voice but never the correct/wrong feedback. "playback" makes
+    // the effects audible like the voice (it may briefly duck other audio, e.g. music).
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+    if (session) try { session.type = 'playback' } catch { /* unsupported */ }
     try {
       ctx = new AC()
       master = ctx.createGain()
