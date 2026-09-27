@@ -56,18 +56,44 @@ export interface Unit {
   description: string
   emoji: string
   lessons: Lesson[]
+  dialogueIds?: string[]        // v2
 }
 
 export interface Course {
   units: Unit[]
   words: Record<string, Word>
   sentences: Record<string, Sentence>
+  /** v2: short conversations / stories. Optional so v1 fixtures still type-check. */
+  dialogues?: Record<string, Dialogue>
+}
+
+// ─── v2: dialogues & stories (comprehensible input) ──────────
+
+export interface DialogueLine {
+  speaker: 'A' | 'B' | 'N'      // N = narrator (stories)
+  hanzi: string                 // for TTS
+  chunks: string[]              // pinyin chunks, same convention as Sentence.chunks
+  sv: string
+  wordIds: string[]
+}
+
+export interface Dialogue {
+  id: string                    // e.g. "u1-d1"
+  unitId: string
+  kind: 'dialogue' | 'story'
+  title: string                 // Swedish
+  context: string               // Swedish scene-setting, 1 sentence ("Du möter din lärare på morgonen.")
+  speakers: { A: string; B: string }   // Swedish role names, e.g. { A: 'Du', B: 'Läraren' }
+  lines: DialogueLine[]
+  /** Unlocks after this lesson is completed. */
+  afterLessonId: string
 }
 
 // ─── Exercises ───────────────────────────────────────────────
 
 /** What the learner is being tested on — key for spaced repetition. */
-export type ItemRef = { kind: 'word' | 'sentence'; id: string }
+export type ItemRef = { kind: 'word' | 'sentence' | 'line'; id: string }
+// v2: kind 'line' = a dialogue line, id = `${dialogueId}:${lineIndex}` (look up in course.dialogues).
 
 export type Exercise =
   | { type: 'intro'; item: ItemRef }                                   // new-word card, listen, no scoring
@@ -80,11 +106,17 @@ export type Exercise =
   | { type: 'build-sv'; item: ItemRef; tiles: string[] }                          // audio+pinyin shown → order Swedish chunks
   | { type: 'type-pinyin'; item: ItemRef }                                        // hear/see Swedish → type pinyin (tone numbers ok)
   | { type: 'speak'; item: ItemRef }                                              // say it → speech recognition
+  // ── v2 ──
+  | { type: 'fill-blank'; item: ItemRef; blankIndex: number; options: string[]; answer: string }  // sentence with one pinyin chunk missing → pick it
+  | { type: 'listen-build'; item: ItemRef; tiles: string[] }                      // audio ONLY (no Swedish, no pinyin) → order pinyin chunks
+  | { type: 'dialogue-reply'; item: ItemRef; options: string[]; answer: string } // item.kind='line' (the REPLY line); show previous line(s) → pick the reply (pinyin)
+  | { type: 'shadow'; item: ItemRef }                                             // listen → repeat aloud (self-graded or mic)
 
 export interface ItemResult { item: ItemRef; correct: boolean }
 
 export interface LessonResult {
   lessonId: string | null       // null for review/practice sessions
+  source?: 'lesson' | 'review' | 'game' | 'lab' | 'dialogue' | 'placement'   // v2, default 'lesson' if lessonId else 'review'
   total: number                 // scored exercises
   correct: number
   mistakes: number
@@ -101,6 +133,10 @@ export interface Settings {
   soundEffects: boolean         // default true
   speakingExercises: boolean    // default true (disable if no mic)
   dailyGoalXp: number           // default 30
+  // v2 (optional → old saves stay valid; readers apply the defaults)
+  theme?: 'system' | 'light' | 'dark'   // default 'system'
+  reduceMotion?: boolean                // default false (also honour prefers-reduced-motion)
+  multiVoice?: boolean                  // default true — rotate between available zh voices (tone perception research)
 }
 
 export interface SrsCard {

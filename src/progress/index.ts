@@ -5,6 +5,7 @@ import type { ItemRef, LessonResult, Settings, SrsCard } from '../types'
 import { course } from '../data/course'
 import * as logic from './logic'
 import { localDay } from './dates'
+import { emitSessionFinished } from './events'
 import { getProgressStore, STORAGE_KEY } from './storage'
 import type { ProgressStore } from './storage'
 
@@ -33,12 +34,16 @@ export interface ProgressApi {
   todayXp(): number
   updateSettings(patch: Partial<Settings>): void
   resetAll(): void
+  /** v2: how well an item is known, 0 (unseen) … 5 (mastered). Pedagogy agent owns the model. */
+  mastery(item: ItemRef): number
 }
 
 // Extra exports (pure helpers usable outside React).
 export { DEFAULT_SETTINGS, displayStreak, xpHistory, sessionXp, cardKey } from './logic'
 export { localDay, addDays } from './dates'
 export { STORAGE_KEY } from './storage'
+export { onSessionFinished } from './events'
+export type { SessionEvent } from './events'
 
 /** Serialized progress backup (JSON string). */
 export function exportProgress(): string {
@@ -54,7 +59,11 @@ export function buildApi(store: ProgressStore, state: ProgressState, c = course)
   const today = () => localDay(store.now())
   return {
     state,
-    finishSession: (result) => store.finishSession(result),
+    finishSession: (result) => {
+      const r = store.finishSession(result)
+      emitSessionFinished({ result, ...r, at: store.now().getTime() })
+      return r
+    },
     lessonStatus: (id) => logic.lessonStatus(state, c, id),
     dueItems: (limit) => logic.dueItems(state, today(), limit),
     weakItems: (limit) => logic.weakItems(state, limit),
@@ -62,6 +71,12 @@ export function buildApi(store: ProgressStore, state: ProgressState, c = course)
     todayXp: () => logic.todayXp(state, today()),
     updateSettings: (patch) => store.updateSettings(patch),
     resetAll: () => store.resetAll(),
+    // Placeholder model until the pedagogy agent replaces it.
+    mastery: (item) => {
+      const card = state.cards[logic.cardKey(item)]
+      if (!card) return 0
+      return Math.max(1, Math.min(5, card.reps + 1 - Math.min(card.lapses, 2)))
+    },
   }
 }
 

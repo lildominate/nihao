@@ -198,6 +198,10 @@ const TIER: Record<Exercise['type'], number> = {
   'sv-to-pinyin': 3,
   'type-pinyin': 4,
   'build-pinyin': 4,
+  'fill-blank': 2,
+  'listen-build': 4,
+  'dialogue-reply': 3,
+  shadow: 4,
   speak: 4,
 }
 
