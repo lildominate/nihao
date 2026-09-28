@@ -18,6 +18,7 @@ import { Blixtquiz } from './play/Blixtquiz'
 import { Tonjakt } from './play/Tonjakt'
 import { Meningsbyggaren, sentencesFor } from './play/Meningsbyggaren'
 import { PanpanSnake } from './play/PanpanSnake'
+import { Restaurangrusch } from './play/Restaurangrusch'
 import { PanpansBro } from './play/PanpansBro'
 
 interface GameDef {
@@ -61,6 +62,11 @@ const GAMES: GameDef[] = [
     id: 'snake', title: 'Pānpan Snake', tagline: 'Ät rätt pinyin och väx!',
     rules: ['Läs det svenska ordet högst upp och styr Pānpan till rätt pinyin-bit. Svep, använd pilarna eller piltangenterna.', 'Rätt bit gör ormen längre. Fel bit kostar ett ❤️ (du har tre) och ormen blir en bit kortare. Vägg eller svans kostar också ett ❤️, men du börjar om på en säker plats.', 'Det går allt snabbare, fler bitar dyker upp och senare kommer korta fraser. Ca 15 frågor per bana.'],
     gradient: 'from-lime-400 to-green-600', shadow: 'shadow-[0_5px_0_#15803d]', component: PanpanSnake,
+  },
+  {
+    id: 'restaurant', title: 'Restaurangrusch', tagline: 'Laga det kunderna beställer!',
+    rules: ['Du är kock i Pānpans kök. Kunden beställer på kinesiska – lyssna (🔊) och läs pinyin.', 'Tryck på rätt rätter och drycker så hamnar de på brickan, tryck sedan Servera innan tålamodet tar slut.', 'Rätt beställning ger dricks. Fel eller för sent kostar en ⭐ (du har tre). 8 kunder per pass, beställningarna blir längre.'],
+    gradient: 'from-orange-400 to-red-500', shadow: 'shadow-[0_5px_0_#b91c1c]', component: Restaurangrusch,
   },
   {
     id: 'bridge', title: 'Pānpans bro', tagline: 'Bygg bron och hoppa över!',

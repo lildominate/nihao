@@ -114,4 +114,17 @@ function Runner() {
   )
 }
 
-export const GAME_ART: Record<GameId, () => React.JSX.Element> = { ordregn: Rain, runner: Runner, memory: Cards, blixt: Bolt, tonjakt: Tones, bygg: Blocks, snake: Snake, bridge: Bridge }
+/** Restaurangrusch: a steaming noodle bowl with chopsticks. */
+function Kitchen() {
+  return (
+    <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden="true">
+      <path d="M22 14c0-4 4-4 4-8M32 14c0-4 4-4 4-8M42 14c0-4 4-4 4-8" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" opacity=".8" />
+      <path d="M8 30h48a24 22 0 0 1-48 0z" fill="#fff" />
+      <path d="M12 30h40" stroke="#f97316" strokeWidth="4" />
+      <path d="M18 36c4 3 8-3 12 0s8-3 12 0" stroke="#fbbf24" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M40 22l18-14M44 24l16-11" stroke="#7c2d12" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export const GAME_ART: Record<GameId, () => React.JSX.Element> = { ordregn: Rain, runner: Runner, memory: Cards, blixt: Bolt, tonjakt: Tones, bygg: Blocks, snake: Snake, bridge: Bridge, restaurant: Kitchen }
