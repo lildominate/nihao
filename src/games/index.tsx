@@ -17,6 +17,8 @@ import { PanpanRunner } from './play/PanpanRunner'
 import { Blixtquiz } from './play/Blixtquiz'
 import { Tonjakt } from './play/Tonjakt'
 import { Meningsbyggaren, sentencesFor } from './play/Meningsbyggaren'
+import { PanpanSnake } from './play/PanpanSnake'
+import { PanpansBro } from './play/PanpansBro'
 
 interface GameDef {
   id: GameId
@@ -27,6 +29,10 @@ interface GameDef {
   shadow: string
   component: ComponentType<GameProps>
   modes?: { id: string; label: string }[]
+  /** Playable only when there are sentences made of known words. */
+  needsSentences?: boolean
+  /** Kept for compatibility (PlayGame, records) but not shown as a card in the hub. */
+  hidden?: boolean
 }
 
 const GAMES: GameDef[] = [
@@ -52,9 +58,19 @@ const GAMES: GameDef[] = [
     gradient: 'from-teal-400 to-emerald-600', shadow: 'shadow-[0_5px_0_#047857]', component: PanpanRunner,
   },
   {
+    id: 'snake', title: 'Pānpan Snake', tagline: 'Ät rätt pinyin och väx!',
+    rules: ['Läs det svenska ordet högst upp och styr Pānpan till rätt pinyin-bit. Svep, använd pilarna eller piltangenterna.', 'Rätt bit gör ormen längre. Fel bit kostar ett ❤️ (du har tre) och ormen blir en bit kortare. Vägg eller svans kostar också ett ❤️, men du börjar om på en säker plats.', 'Det går allt snabbare, fler bitar dyker upp och senare kommer korta fraser. Ca 15 frågor per bana.'],
+    gradient: 'from-lime-400 to-green-600', shadow: 'shadow-[0_5px_0_#15803d]', component: PanpanSnake,
+  },
+  {
+    id: 'bridge', title: 'Pānpans bro', tagline: 'Bygg bron och hoppa över!',
+    rules: ['Läs meningen på svenska (tryck på högtalaren för att lyssna).', 'Tryck på pinyin-bitarna i rätt ordning. Varje rätt bit blir en planka och Pānpan hoppar fram. Fel bit spricker och faller: du förlorar ett ❤️ (du har tre).', 'Bygg klart meningen så springer Pānpan över. Varje bro blir längre. Sex broar per bana.'],
+    gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-[0_5px_0_#be123c]', component: PanpansBro, needsSentences: true, hidden: true, // not in the hub until it has been played through on device
+  },
+  {
     id: 'bygg', title: 'Meningsbyggaren', tagline: 'Bygg meningar mot klockan.',
     rules: ['Du ser en mening på svenska.', 'Tryck på pinyinbitarna i rätt ordning.', 'Du har 90 sekunder. Felfria meningar ger dubbla poäng.'],
-    gradient: 'from-emerald-400 to-teal-500', shadow: 'shadow-[0_5px_0_#0f766e]', component: Meningsbyggaren,
+    gradient: 'from-emerald-400 to-teal-500', shadow: 'shadow-[0_5px_0_#0f766e]', component: Meningsbyggaren, needsSentences: true,
   },
 ]
 
@@ -66,7 +82,9 @@ const MODE_KEY = 'nihao/games/mode'
 function loadMode(): string { try { return localStorage.getItem(MODE_KEY) ?? 'normal' } catch { return 'normal' } }
 function saveMode(m: string) { try { localStorage.setItem(MODE_KEY, m) } catch { /* private mode */ } }
 
-export const GAME_IDS: GameId[] = GAMES.map((g) => g.id)
+/** Games shown in the hub (Meningsbyggaren is replaced by Pānpans bro but still playable through PlayGame). */
+const HUB_GAMES = GAMES.filter((g) => !g.hidden)
+export const GAME_IDS: GameId[] = HUB_GAMES.map((g) => g.id)
 export const GAME_TITLES: Record<GameId, string> = Object.fromEntries(GAMES.map((g) => [g.id, g.title])) as Record<GameId, string>
 
 /** Pure-ish pick for 'auto': the runner once ≥8 words are known, else Ordregn. */
@@ -145,8 +163,8 @@ export function PlayGame({ gameId, onDone }: { gameId: GameId | 'auto'; onDone: 
     const knownIds = progress.knownWordIds()
     const pool = buildWordPool(knownIds, course)
     let id: GameId = gameId === 'auto' ? autoGameId(pool.knownCount) : gameId
-    // Meningsbyggaren needs playable sentences; otherwise fall back to Ordregn.
-    if (id === 'bygg' && sentencesFor(pool.words.map((w) => w.id)).length === 0) id = 'ordregn'
+    // Sentence games need playable sentences; otherwise fall back to Ordregn.
+    if (GAMES.find((g) => g.id === id)?.needsSentences && sentencesFor(pool.words.map((w) => w.id)).length === 0) id = 'ordregn'
     return { pool, def: GAMES.find((g) => g.id === id) ?? GAMES[0] }
   })
   return <GameSession def={init.def} words={init.pool.words} onClose={(played) => onDone({ played })} />
@@ -192,10 +210,10 @@ export function GamesHub() {
       )}
 
       <div className="mt-5 flex flex-col gap-4">
-        {GAMES.map((g, i) => {
+        {HUB_GAMES.map((g, i) => {
           const rec = records[g.id]
           const Art = GAME_ART[g.id]
-          const disabled = g.id === 'bygg' && !canBuild
+          const disabled = !!g.needsSentences && !canBuild
           return (
             <button key={g.id} type="button" disabled={disabled} onClick={() => open(g)}
               style={{ animationDelay: `${i * 50}ms` }}

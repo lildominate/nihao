@@ -56,6 +56,43 @@ function Blocks() {
   )
 }
 
+function Snake() {
+  return (
+    <svg viewBox="0 0 100 100" className={S} aria-hidden="true">
+      <rect x="8" y="10" width="84" height="80" rx="14" fill="#fff" fillOpacity=".9" />
+      <g fill="#d9f5ea"><rect x="8" y="10" width="21" height="20" /><rect x="50" y="10" width="21" height="20" /><rect x="29" y="30" width="21" height="20" /><rect x="71" y="30" width="21" height="20" /></g>
+      <rect x="16" y="20" width="34" height="14" rx="7" fill="#fff" stroke="#d9412e" strokeWidth="2.5" /><text x="33" y="30.5" fontSize="9" fontWeight="900" textAnchor="middle" fill="#9333ea">māo</text>
+      <path d="M78 72H44a10 10 0 0 1 0-20h20" fill="none" stroke="#0a7a5a" strokeWidth="13" strokeLinecap="round" />
+      <path d="M78 72H44a10 10 0 0 1 0-20h20" fill="none" stroke="#12a179" strokeWidth="7" strokeLinecap="round" />
+      <path d="M70 72v0M58 72v0M46 72v0" stroke="#0a7a5a" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="68" cy="52" r="11" fill="#fff" stroke="#c9c1d0" strokeWidth="1.5" />
+      <circle cx="59" cy="43" r="4.6" fill="#2b2533" /><circle cx="77" cy="43" r="4.6" fill="#2b2533" />
+      <ellipse cx="63.4" cy="52" rx="3" ry="3.8" fill="#2b2533" /><ellipse cx="72.6" cy="52" rx="3" ry="3.8" fill="#2b2533" />
+      <circle cx="64" cy="51" r="1.1" fill="#fff" /><circle cx="73.2" cy="51" r="1.1" fill="#fff" />
+      <ellipse cx="68" cy="57.5" rx="2.4" ry="1.7" fill="#2b2533" />
+    </svg>
+  )
+}
+
+function Bridge() {
+  return (
+    <svg viewBox="0 0 100 100" className={S} aria-hidden="true">
+      <path d="M0 58h26v42H0Z" fill="#efe5d6" /><path d="M74 58h26v42H74Z" fill="#efe5d6" />
+      <rect x="-2" y="53" width="30" height="8" rx="4" fill="#12a179" /><rect x="72" y="53" width="30" height="8" rx="4" fill="#12a179" />
+      <path d="M28 88q22 8 44 0" stroke="#bae6fd" strokeWidth="4" strokeLinecap="round" fill="none" />
+      <rect x="28" y="54" width="14" height="8" rx="2.5" fill="#fbbf24" stroke="#a52a1b" strokeWidth="1.6" />
+      <rect x="43" y="54" width="14" height="8" rx="2.5" fill="#fbbf24" stroke="#a52a1b" strokeWidth="1.6" />
+      <g className="g-drift"><rect x="58" y="46" width="14" height="8" rx="2.5" fill="#fff" stroke="#a52a1b" strokeWidth="1.6" transform="rotate(-10 65 50)" /></g>
+      <rect x="18" y="26" width="4" height="30" rx="1.5" fill="#d9412e" /><circle cx="20" cy="30" r="5" fill="#d9412e" stroke="#fbbf24" strokeWidth="2" />
+      <ellipse cx="33" cy="52" rx="13" ry="3.2" fill="#000" opacity=".12" />
+      <circle cx="33" cy="38" r="11" fill="#fff" /><circle cx="24.5" cy="29" r="4.6" fill="#2b2533" /><circle cx="41.5" cy="29" r="4.6" fill="#2b2533" />
+      <ellipse cx="28.6" cy="38" rx="3" ry="3.8" fill="#2b2533" /><ellipse cx="37.4" cy="38" rx="3" ry="3.8" fill="#2b2533" />
+      <circle cx="29.2" cy="37" r="1.1" fill="#fff" /><circle cx="38" cy="37" r="1.1" fill="#fff" />
+      <path d="M28 45q5 4 10 0" stroke="#d9412e" strokeWidth="3" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+}
+
 function Runner() {
   return (
     <svg viewBox="0 0 100 100" className={S} aria-hidden="true">
@@ -77,4 +114,4 @@ function Runner() {
   )
 }
 
-export const GAME_ART: Record<GameId, () => React.JSX.Element> = { ordregn: Rain, runner: Runner, memory: Cards, blixt: Bolt, tonjakt: Tones, bygg: Blocks }
+export const GAME_ART: Record<GameId, () => React.JSX.Element> = { ordregn: Rain, runner: Runner, memory: Cards, blixt: Bolt, tonjakt: Tones, bygg: Blocks, snake: Snake, bridge: Bridge }
