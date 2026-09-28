@@ -24,6 +24,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: node scripts/fetch-videos.mjs
+        env:
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3

@@ -8,6 +8,7 @@ import { useProgress } from '../progress'
 import { Button } from '../ui/Button'
 import { Panda } from '../mascot/Panda'
 import { useReducedMotion } from '../motion'
+import { useYouTubeState, youtubeEmbedUrl } from '../videos/youtube'
 
 export interface SongDef { id: string; title: string; youtubeId: string }
 
@@ -64,31 +65,6 @@ export function knownWordsIn(line: string): { hanzi: string; pinyin: string; sv:
     }
   }
   return found.sort((a, b) => a.at - b.at).map(({ hanzi, pinyin, sv }) => ({ hanzi, pinyin, sv }))
-}
-
-/**
- * Tracks whether the embedded YouTube player is playing, via the IFrame player's postMessage
- * protocol (no extra script). Needs `enablejsapi=1` on the embed URL.
- */
-function useYouTubePlaying(frame: React.RefObject<HTMLIFrameElement | null>): boolean {
-  const [playing, setPlaying] = useState(false)
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (!/youtube(-nocookie)?\.com$/.test(new URL(e.origin).hostname)) return
-      try {
-        const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
-        const state = d?.info?.playerState ?? (d?.event === 'onStateChange' ? d.info : undefined)
-        if (typeof state === 'number') setPlaying(state === 1)
-      } catch { /* not a player message */ }
-    }
-    window.addEventListener('message', onMessage)
-    const hello = () => frame.current?.contentWindow?.postMessage(JSON.stringify({ event: 'listening', id: 'nihao-song' }), '*')
-    const el = frame.current
-    el?.addEventListener('load', hello)
-    const t = setInterval(hello, 1500) // player may load late; handshake is idempotent
-    return () => { window.removeEventListener('message', onMessage); el?.removeEventListener('load', hello); clearInterval(t) }
-  }, [frame])
-  return playing
 }
 
 /** Pānpan "music video": an original stage where Pānpan dances while the song plays. */
@@ -167,7 +143,7 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
   const [current, setCurrent] = useState<number | null>(null) // line shown on the stage
   const run = useRef(0)
   const frame = useRef<HTMLIFrameElement>(null)
-  const videoPlaying = useYouTubePlaying(frame)
+  const videoPlaying = useYouTubeState(frame) === 1
   const listRef = useRef<HTMLOListElement>(null)
 
   // pinyin-pro is large: load it only when a song is opened.
@@ -228,7 +204,7 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
           <iframe
             ref={frame}
             className="h-full w-full"
-            src={`https://www.youtube-nocookie.com/embed/${song.youtubeId}?playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`}
+            src={youtubeEmbedUrl(song.youtubeId)}
             title={song.title}
             allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen

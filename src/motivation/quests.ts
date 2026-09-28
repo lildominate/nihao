@@ -1,7 +1,7 @@
 // Pure daily-quest logic: deterministic selection from the date + progress from session events.
 import type { LessonResult } from '../types'
 
-export type QuestKind = 'xp' | 'lessons' | 'run' | 'game' | 'lab' | 'review' | 'dialogue' | 'perfect' | 'correct'
+export type QuestKind = 'xp' | 'lessons' | 'run' | 'game' | 'lab' | 'review' | 'dialogue' | 'perfect' | 'correct' | 'video'
 
 export interface QuestDef {
   id: string            // stable, e.g. "xp-30"
@@ -26,6 +26,7 @@ export const QUEST_POOL: QuestDef[] = [
   { id: 'review-15', kind: 'review', target: 15, title: 'Repetera 15 ord', emoji: '🔁' },
   { id: 'review-10', kind: 'review', target: 10, title: 'Repetera 10 ord', emoji: '🔁' },
   { id: 'dialogue-1', kind: 'dialogue', target: 1, title: 'Lyssna på en dialog', emoji: '💬' },
+  { id: 'video-1', kind: 'video', target: 1, title: 'Titta på en video i Videokursen', emoji: '📺' },
   { id: 'perfect-1', kind: 'perfect', target: 1, title: 'Klara ett pass utan fel', emoji: '💎' },
   { id: 'correct-25', kind: 'correct', target: 25, title: 'Svara rätt 25 gånger', emoji: '✅' },
 ]
@@ -110,6 +111,7 @@ export function questDelta(kind: QuestKind, result: LessonResult, xpEarned: numb
     case 'game': return src === 'game' ? 1 : 0
     case 'lab': return src === 'lab' ? 1 : 0
     case 'dialogue': return src === 'dialogue' ? 1 : 0
+    case 'video': return src === 'video' ? 1 : 0
     case 'review': {
       if (src !== 'review') return 0
       const seen = new Set<string>()

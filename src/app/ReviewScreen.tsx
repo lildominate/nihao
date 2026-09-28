@@ -7,6 +7,7 @@ import { useProgress } from '../progress'
 import { isRecognitionAvailable } from '../speech'
 import { LabHub } from '../lab'
 import { SongsCard } from '../songs/SongLesson'
+import { VideoCourseCard } from '../videos/VideoCourse'
 import { multiVoiceOn, reviewGenOptions } from '../pedagogy'
 import { Button } from '../ui/Button'
 import { Badge, SectionHeader } from '../ui/kit'
@@ -39,6 +40,8 @@ function PracticeHub({ onStart }: { onStart: (spec: SessionSpec) => void }) {
       <div className="space-y-5 px-4 pt-4 pb-10">
         {/* Tallabbet (agent 5): self-contained section; its modes open full-screen. */}
         <LabHub />
+
+        <VideoCourseCard />
 
         <SongsCard />
 

@@ -116,7 +116,7 @@ export interface ItemResult { item: ItemRef; correct: boolean }
 
 export interface LessonResult {
   lessonId: string | null       // null for review/practice sessions
-  source?: 'lesson' | 'review' | 'game' | 'lab' | 'dialogue' | 'placement'   // v2, default 'lesson' if lessonId else 'review'
+  source?: 'lesson' | 'review' | 'game' | 'lab' | 'dialogue' | 'placement' | 'video'   // v2, default 'lesson' if lessonId else 'review'
   total: number                 // scored exercises
   correct: number
   mistakes: number
