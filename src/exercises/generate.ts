@@ -811,7 +811,12 @@ function checkpointLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rn
 /** The learner chose not to type pinyin: free-text answers become "pick the right pinyin". */
 // Also: iOS speech recognition hung the lesson on 'speak', so mic exercises stay in Tallabbet only.
 function noTyping(list: Exercise[], course: Course, rng: Rng): Exercise[] {
-  return list.map((e) => (e.type === 'type-pinyin' ? choiceExercise(course, 'sv-to-pinyin', e.item, { rng }) ?? e : e))
+  // Tone identification felt like guessing too: in lessons/reviews it becomes "listen → pick the meaning".
+  // Tone training stays opt-in (generateToneDrill, Tonjakt, Tallabbet).
+  return list.map((e) =>
+    e.type === 'type-pinyin' ? choiceExercise(course, 'sv-to-pinyin', e.item, { rng }) ?? e
+    : e.type === 'tone-pick' ? choiceExercise(course, 'listen-choose', e.item, { rng }) ?? e
+    : e)
 }
 
 function withVoice(list: Exercise[], multiVoice?: boolean): Exercise[] {

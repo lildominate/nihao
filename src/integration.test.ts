@@ -19,6 +19,10 @@ describe('real course × generator', () => {
       expect(scored.length).toBeGreaterThanOrEqual(6)
       expect(scored.length).toBeLessThanOrEqual(20)
       if (!speaking) expect(ex.some((e) => e.type === 'speak')).toBe(false)
+      // Learner feedback: no tone guessing, no free-text pinyin, no mic exercises inside lessons.
+      for (const banned of ['tone-pick', 'type-pinyin', 'speak', 'shadow'] as const) {
+        expect(ex.some((e) => e.type === banned), `${lesson.id} contains ${banned}`).toBe(false)
+      }
       for (const e of ex) {
         for (const it of itemsOf(e)) {
           const ok = it.kind === 'word' ? course.words[it.id] : course.sentences[it.id]
