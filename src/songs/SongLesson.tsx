@@ -89,7 +89,14 @@ function useYouTubePlaying(frame: React.RefObject<HTMLIFrameElement | null>): bo
 }
 
 /** Pānpan "music video": an original stage where Pānpan dances while the song plays. */
-function PanpanStage({ playing }: { playing: boolean }) {
+interface StageCaption { pinyin: string; sv?: string; pos: string }
+
+function PanpanStage({ playing, caption, onPrev, onNext }: {
+  playing: boolean
+  caption: StageCaption | null
+  onPrev: () => void
+  onNext: () => void
+}) {
   const reduced = useReducedMotion()
   const dance = playing && !reduced
   // "Lip-sync": alternate open/closed-mouth moods while the song plays.
@@ -129,6 +136,18 @@ function PanpanStage({ playing }: { playing: boolean }) {
       <div className="absolute right-3 bottom-3 rounded-full bg-black/35 px-3 py-1 text-xs font-bold text-white">
         {playing ? 'Pānpan sjunger ♪' : 'Tryck play på videon ↓'}
       </div>
+      {/* Subtitles: the learner steps lines in time with the song (YouTube gives no lyric timing). */}
+      {caption && (
+        <div className="absolute inset-x-2 top-2 flex items-center gap-1 rounded-2xl bg-black/55 p-2 text-white backdrop-blur-sm">
+          <button type="button" onClick={onPrev} aria-label="Föregående rad" className="press shrink-0 rounded-full px-2 py-1 text-lg font-black">◀</button>
+          <div className="min-w-0 flex-1 text-center" aria-live="polite">
+            <div className="text-lg leading-tight font-black">{caption.pinyin}</div>
+            {caption.sv && <div className="text-xs font-bold opacity-85">{caption.sv}</div>}
+            <div className="text-[10px] font-bold opacity-60">{caption.pos}</div>
+          </div>
+          <button type="button" onClick={onNext} aria-label="Nästa rad" className="press shrink-0 rounded-full px-2 py-1 text-lg font-black">▶</button>
+        </div>
+      )}
     </div>
   )
 }
@@ -142,6 +161,7 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
   const [svEdit, setSvEdit] = useState<number | null>(null)
   const [toPinyin, setToPinyin] = useState<((s: string) => string) | null>(null)
   const [singing, setSinging] = useState<number | null>(null) // line index Pānpan is on
+  const [current, setCurrent] = useState<number | null>(null) // line shown on the stage
   const run = useRef(0)
   const frame = useRef<HTMLIFrameElement>(null)
   const videoPlaying = useYouTubePlaying(frame)
@@ -158,6 +178,18 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
 
   const lines = useMemo(() => text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean), [text])
   const hasHan = lines.some((l) => HAN.test(l) && !isHeading(l))
+  const lyricIdx = useMemo(() => lines.map((l, i) => (!isHeading(l) && HAN.test(l) ? i : -1)).filter((i) => i >= 0), [lines])
+  const shown = singing ?? current ?? lyricIdx[0] ?? null
+  const step = (dir: 1 | -1) => {
+    if (!lyricIdx.length) return
+    const at = shown === null ? -1 : lyricIdx.indexOf(shown)
+    setCurrent(lyricIdx[Math.min(lyricIdx.length - 1, Math.max(0, at + dir))])
+  }
+  const caption: StageCaption | null = editing || shown === null || !toPinyin ? null : {
+    pinyin: toPinyin(lines[shown]),
+    sv: sv[shown],
+    pos: `Rad ${lyricIdx.indexOf(shown) + 1} av ${lyricIdx.length}`,
+  }
   const setLineSv = (i: number, t: string) => { const next = { ...sv, [i]: t }; setSv(next); save(SV_KEY, song.id, next) }
 
   // Karaoke: Pānpan reads the lyric lines one after another, highlighting the current one.
@@ -174,7 +206,7 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
       const rest = Math.max(0, lines[i].length * 280 - (Date.now() - t0))
       await new Promise((r) => setTimeout(r, 500 + rest))
     }
-    if (token === run.current) setSinging(null)
+    if (token === run.current) { setSinging(null) }
   }
   const stop = () => { run.current++; stopSpeaking(); setSinging(null) }
 
@@ -186,7 +218,7 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
           <h1 className="flex-1 text-xl font-black">🎵 {song.title}</h1>
         </div>
 
-        <PanpanStage playing={videoPlaying} />
+        <PanpanStage playing={videoPlaying} caption={caption} onPrev={() => step(-1)} onNext={() => step(1)} />
 
         {/* YouTube's player must stay visible (YouTube API terms); it drives the music. */}
         <div className="mx-auto w-3/4 overflow-hidden rounded-2xl border-2 border-line bg-black shadow-card" style={{ aspectRatio: '16 / 9' }}>
@@ -245,7 +277,7 @@ export function SongLesson({ song, onClose }: { song: SongDef; onClose: () => vo
                   <li key={i} data-line={i} className="flex flex-col gap-1">
                     <button
                       type="button"
-                      onClick={() => { stop(); if (han) void speak(line, { rate }) }}
+                      onClick={() => { stop(); setCurrent(i); if (han) void speak(line, { rate }) }}
                       className={`press w-full rounded-2xl border-2 border-b-4 p-3 text-left transition-colors ${active ? 'border-brand bg-brand-soft' : 'border-line bg-surface'}`}
                     >
                       {han && toPinyin ? (
