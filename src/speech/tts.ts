@@ -91,6 +91,124 @@ export function isSpeechSynthesisAvailable(): boolean {
   return !!synth
 }
 
+// ─── Multi-voice (high-variability phonetic training) ────────
+
+export type VoiceMode = 'auto' | 'primary' | 'rotate'
+
+export interface ChineseVoiceInfo {
+  name: string
+  lang: string
+  voiceURI: string
+  localService: boolean
+  quality: 'premium' | 'enhanced' | 'standard'
+  /** true for the voice used by default ("primary"). */
+  primary: boolean
+}
+
+let multiVoice = true
+/** Enable/disable voice rotation for `voice: 'auto'` (call with settings.multiVoice ?? true). */
+export function setMultiVoice(enabled: boolean): void { multiVoice = enabled !== false }
+export function isMultiVoiceEnabled(): boolean { return multiVoice }
+
+function isMandarin(v: SpeechSynthesisVoice): boolean {
+  const lang = v.lang.replace('_', '-').toLowerCase()
+  const name = v.name.toLowerCase()
+  if (lang === 'zh-hk' || lang === 'zh-mo' || lang.startsWith('yue')) return false
+  if (/cantonese|粤|粵|hong kong|香港/.test(name)) return false
+  return lang === 'zh' || lang.startsWith('zh-') || lang.startsWith('cmn')
+}
+
+/** "Tingting (Enhanced)" / "Tingting" → "tingting" (one entry per speaker). */
+function speakerKey(v: SpeechSynthesisVoice): string {
+  return v.name.toLowerCase().replace(/\(.*?\)|（.*?）/g, '').replace(/\b(enhanced|premium|compact|siri)\b/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function qualityOf(v: SpeechSynthesisVoice): ChineseVoiceInfo['quality'] {
+  const name = v.name.toLowerCase(), uri = (v.voiceURI || '').toLowerCase()
+  if (/premium/.test(name) || /\.premium\./.test(uri)) return 'premium'
+  if (/enhanced|增强|高品质|natural|neural/.test(name) || /\.enhanced\./.test(uri)) return 'enhanced'
+  return 'standard'
+}
+
+/** Good Mandarin voices (zh-CN/zh-TW, no Cantonese, no novelty voices), primary first, one per speaker. */
+function goodVoices(): SpeechSynthesisVoice[] {
+  if (!synth) return []
+  const primary = voice ?? pickVoice()
+  const best = new Map<string, { v: SpeechSynthesisVoice; s: number }>()
+  for (const v of synth.getVoices()) {
+    if (!isMandarin(v)) continue
+    const s = scoreVoice(v)
+    if (s < 40) continue
+    const key = speakerKey(v)
+    const prev = best.get(key)
+    if (!prev || s > prev.s || v === primary) best.set(key, { v, s: v === primary ? Infinity : s })
+  }
+  return [...best.values()].sort((a, b) => b.s - a.s).map((x) => x.v)
+}
+
+/** The Mandarin voices used for rotation (primary first; excludes Cantonese zh-HK). */
+export function listChineseVoices(): ChineseVoiceInfo[] {
+  return goodVoices().map((v, i) => ({
+    name: v.name, lang: v.lang, voiceURI: v.voiceURI, localService: v.localService,
+    quality: qualityOf(v), primary: i === 0,
+  }))
+}
+
+let rotateIdx = 0
+let lastUsedVoice: string | null = null
+/** Name of the voice used by the latest speak() (changes when rotating). */
+export function lastVoiceName(): string | null { return lastUsedVoice }
+
+/** Picks a voice (+ a pitch variation when only one voice exists and rotation was asked for explicitly). */
+function chooseVoice(mode: VoiceMode): { v: SpeechSynthesisVoice | null; pitch: number } {
+  const primary = voice ?? pickVoice()
+  if (mode === 'primary' || (mode === 'auto' && !multiVoice)) return { v: primary, pitch: 1 }
+  const list = goodVoices()
+  if (list.length > 1) {
+    const v = list[rotateIdx % list.length]
+    rotateIdx++
+    return { v, pitch: 1 }
+  }
+  if (mode === 'rotate') {
+    // Only one voice: vary the pitch a little so the ear still meets some variability.
+    const pitches = [1, 0.85, 1.15]
+    const pitch = pitches[rotateIdx % pitches.length]
+    rotateIdx++
+    return { v: primary, pitch }
+  }
+  return { v: primary, pitch: 1 }
+}
+
+// ─── Swedish voice (hands-free listening) ────────────────────
+
+function scoreSvVoice(v: SpeechSynthesisVoice): number {
+  const lang = v.lang.replace('_', '-').toLowerCase()
+  if (!lang.startsWith('sv')) return -1
+  const name = v.name.toLowerCase(), uri = (v.voiceURI || '').toLowerCase()
+  let s = lang === 'sv-se' ? 50 : 30
+  if (/premium/.test(name) || /\.premium\./.test(uri)) s += 30
+  else if (/enhanced|natural|neural|online/.test(name) || /\.enhanced\./.test(uri)) s += 22
+  if (/alva|klara|oskar|sofie|mattias|hillevi|google/.test(name)) s += 10
+  if (/eloquence|novelty|grandma|grandpa|rocko|shelley|flo|reed|sandy/.test(name)) s -= 20
+  if (v.localService) s += 2
+  return s
+}
+
+function pickSvVoice(): SpeechSynthesisVoice | null {
+  if (!synth) return null
+  let best: SpeechSynthesisVoice | null = null, bestScore = -1
+  for (const v of synth.getVoices()) {
+    const sc = scoreSvVoice(v)
+    if (sc > bestScore) { best = v; bestScore = sc }
+  }
+  return bestScore >= 0 ? best : null
+}
+
+/** True if a Swedish (sv-SE) voice exists. */
+export function hasSwedishVoice(): boolean { return !!pickSvVoice() }
+
+// ─── Speaking ────────────────────────────────────────────────
+
 // Keep references so Chrome doesn't GC the utterance (which drops onend).
 let current: { utter: SpeechSynthesisUtterance; finish: () => void } | null = null
 let keepAlive: ReturnType<typeof setInterval> | null = null
@@ -109,8 +227,20 @@ export function stopSpeaking(): void {
   synth?.cancel()
 }
 
+export interface SpeakOptions {
+  rate?: number
+  slow?: boolean
+  /**
+   * 'primary' (default): the best voice. 'rotate': cycle through all good Mandarin voices.
+   * 'auto': rotate if multi-voice is on (setMultiVoice / settings.multiVoice) and >1 voice exists, else primary.
+   */
+  voice?: VoiceMode
+  /** Called with the chosen voice's name just before speaking (handy with rotation). */
+  onVoice?: (name: string | null) => void
+}
+
 /** Speak Chinese text (pass HANZI for correct pronunciation). Resolves when finished (never rejects/hangs). */
-export async function speak(hanzi: string, opts?: { rate?: number; slow?: boolean }): Promise<void> {
+export async function speak(hanzi: string, opts?: SpeakOptions): Promise<void> {
   if (!synth || !hanzi.trim()) return
   const wasBusy = synth.speaking || synth.pending || current !== null
   stopSpeaking()
@@ -124,41 +254,66 @@ export async function speak(hanzi: string, opts?: { rate?: number; slow?: boolea
 
   const base = opts?.rate ?? defaultRate
   const rate = opts?.slow ? Math.min(0.6, base * 0.75) : base
+  const { v, pitch } = chooseVoice(opts?.voice ?? 'primary')
+  lastUsedVoice = v?.name ?? null
+  opts?.onVoice?.(lastUsedVoice)
+  return utter(hanzi, v, v?.lang ?? 'zh-CN', rate, pitch)
+}
 
+/**
+ * Speak Swedish text with an sv-SE voice. Resolves `false` right away if no Swedish voice exists
+ * (the caller should then show the text instead).
+ */
+export async function speakSwedish(text: string, opts?: { rate?: number }): Promise<boolean> {
+  if (!synth || !text.trim()) return false
+  if (!voicesLoaded && !waitedForVoices) await voicesReady()
+  const sv = pickSvVoice()
+  if (!sv) return false
+  const wasBusy = synth.speaking || synth.pending || current !== null
+  stopSpeaking()
+  const seq = speakSeq
+  if (wasBusy && !isIOS) await new Promise((r) => setTimeout(r, 60))
+  if (seq !== speakSeq) return true
+  await utter(text, sv, sv.lang, opts?.rate ?? 1, 1)
+  return true
+}
+
+function utter(text: string, v: SpeechSynthesisVoice | null, lang: string, rate: number, pitch: number): Promise<void> {
+  const s = synth!
   return new Promise<void>((resolve) => {
-    const utter = new SpeechSynthesisUtterance(hanzi)
-    utter.lang = voice?.lang ?? 'zh-CN'
-    if (voice) utter.voice = voice
-    utter.rate = rate
-    utter.pitch = 1
-    utter.volume = 1
+    const u = new SpeechSynthesisUtterance(text)
+    u.lang = lang
+    if (v) u.voice = v
+    u.rate = rate
+    u.pitch = pitch
+    u.volume = 1
 
     let finished = false
     const finish = () => {
       if (finished) return
       finished = true
       clearTimeout(timer)
-      if (current?.utter === utter) { current = null; clearKeepAlive() }
+      if (current?.utter === u) { current = null; clearKeepAlive() }
       resolve()
     }
     // Fallback so the promise never hangs (lost onend, no audio output, …)
-    const est = 1500 + ([...hanzi].length * 450) / Math.max(rate, 0.3)
+    const est = 1500 + ([...text].length * 450) / Math.max(rate, 0.3)
     const timer = setTimeout(finish, Math.min(est, 30000))
 
-    utter.onend = finish
-    utter.onerror = finish
-    current = { utter, finish }
+    u.onend = finish
+    u.onerror = finish
+    current = { utter: u, finish }
 
-    synth.speak(utter)
+    s.speak(u)
     // iOS/Safari can get stuck in paused state
-    if (synth.paused) synth.resume()
+    if (s.paused) s.resume()
     // Chrome desktop stops long utterances after ~15 s unless nudged
-    if (isChromeDesktop && [...hanzi].length > 30) {
+    if (isChromeDesktop && [...text].length > 30) {
       clearKeepAlive()
       keepAlive = setInterval(() => {
-        if (!synth.speaking) { clearKeepAlive(); return }
-        synth.pause()
-        synth.resume()
+        if (!s.speaking) { clearKeepAlive(); return }
+        s.pause()
+        s.resume()
       }, 10000)
     }
   })

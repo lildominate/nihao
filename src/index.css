@@ -1,73 +1,203 @@
 @import "tailwindcss";
 @import "./styles/motion.css";
 
-/* SHARED DESIGN TOKENS — owned by the Shell agent; everyone uses these via Tailwind
-   (e.g. bg-brand, text-ink-muted, border-line, text-tone-3). */
+/* `dark:` follows the app theme (html[data-theme="dark"]), not only the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* SHARED DESIGN TOKENS — owned by Design (agent 1); everyone uses these via Tailwind
+   (e.g. bg-brand, text-ink-muted, border-line, text-tone-3, shadow-card, font-display).
+   Every colour below has a dark-mode value further down, so token-based UI works in both themes.
+   Palette: jade (brand), red lacquer (accent), warm paper surfaces, gold. */
 @theme {
-  --color-brand: #16a34a;
-  --color-brand-dark: #15803d;
-  --color-brand-soft: #dcfce7;
-  --color-danger: #dc2626;
-  --color-danger-soft: #fee2e2;
-  --color-warn: #f59e0b;
-  --color-ink: #1f2937;
-  --color-ink-muted: #6b7280;
-  --color-surface: #ffffff;
-  --color-surface-2: #f3f4f6;
-  --color-line: #e5e7eb;
-  /* extra shell accents */
-  --color-gold: #facc15;
-  --color-gold-dark: #ca8a04;
-  --color-flame: #f97316;
-  --color-sky: #0ea5e9;
-  --color-sky-dark: #0284c7;
-  --color-sky-soft: #e0f2fe;
+  /* brand = jade */
+  --color-brand: #12a179;
+  --color-brand-dark: #0a7a5a;
+  --color-brand-soft: #d9f5ea;
+  --color-brand-light: #34c79a;
+  /* feedback */
+  --color-danger: #e5484d;
+  --color-danger-dark: #b8292e;
+  --color-danger-soft: #fde7e7;
+  --color-warn: #f5a524;
+  --color-warn-dark: #c77d06;
+  --color-warn-soft: #fff3d9;
+  /* text & surfaces (warm) */
+  --color-ink: #2a2331;
+  --color-ink-muted: #7a7184;
+  --color-ink-faint: #b3aab9;
+  --color-surface: #fffdf9;
+  --color-surface-2: #f7f0e6;
+  --color-surface-3: #efe5d6;
+  --color-canvas: #fbf5ec;
+  --color-line: #ece2d3;
+  --color-line-dark: #dccfbc;
+  /* shell accents */
+  --color-gold: #fbbf24;
+  --color-gold-dark: #cc8a0a;
+  --color-gold-soft: #fff4d1;
+  --color-flame: #ff7a1a;
+  --color-flame-soft: #ffeadb;
+  --color-sky: #1e9bf0;
+  --color-sky-dark: #0c72c0;
+  --color-sky-soft: #ddf0fd;
+  --color-lacquer: #d9412e;
+  --color-lacquer-dark: #a52a1b;
+  --color-lacquer-soft: #fde5de;
+  --color-plum: #8b5cf6;
+  --color-plum-dark: #6a3fd0;
+  --color-plum-soft: #eee6fe;
+  --color-on-color: #ffffff; /* text/icons on coloured faces */
   /* tone colours (Pleco-style): 1 red, 2 green, 3 blue, 4 purple, 5 grey */
   --color-tone-1: #e11d48;
   --color-tone-2: #16a34a;
   --color-tone-3: #2563eb;
   --color-tone-4: #9333ea;
   --color-tone-5: #6b7280;
+
   --font-sans: "Nunito", ui-rounded, system-ui, sans-serif;
+  --font-display: "Fredoka", "Nunito", ui-rounded, system-ui, sans-serif;
+
+  --shadow-card: 0 1px 0 rgb(80 50 20 / 0.04), 0 10px 28px -14px rgb(80 50 20 / 0.28);
+  --shadow-float: 0 18px 40px -16px rgb(60 35 15 / 0.38);
+  --shadow-soft: 0 6px 18px -10px rgb(80 50 20 / 0.3);
 
   --animate-bob: bob 1.4s ease-in-out infinite;
   --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  --animate-sheet: sheet-up 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-sheet: sheet-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade: fade-in 0.2s ease-out both;
   --animate-wiggle: wiggle 1.8s ease-in-out infinite;
+  --animate-float: float 3.2s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 1.8s ease-out infinite;
+  --animate-rise: rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 
   @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
   @keyframes pop { from { transform: scale(0.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
   @keyframes sheet-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
   @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
   @keyframes wiggle { 0%, 100% { transform: rotate(0) } 10% { transform: rotate(-8deg) } 20% { transform: rotate(8deg) } 30% { transform: rotate(0) } }
+  @keyframes float { 0%, 100% { transform: translateY(0) rotate(0) } 50% { transform: translateY(-5px) rotate(-1.5deg) } }
+  @keyframes pulse-ring { 0% { transform: scale(0.92); opacity: 0.7 } 100% { transform: scale(1.35); opacity: 0 } }
+  @keyframes rise { from { transform: translateY(14px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
 }
-:root { --tone-1: var(--color-tone-1); --tone-2: var(--color-tone-2); --tone-3: var(--color-tone-3); --tone-4: var(--color-tone-4); --tone-5: var(--color-tone-5); }
+
+/* ── Dark theme (html[data-theme="dark"], set from settings.theme) ── */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-brand: #1fbf8f;
+  --color-brand-dark: #0d8a64;
+  --color-brand-soft: #123a2f;
+  --color-brand-light: #45d6a8;
+  --color-danger: #f0646a;
+  --color-danger-dark: #b8343a;
+  --color-danger-soft: #3e1d22;
+  --color-warn: #f7b23b;
+  --color-warn-dark: #b37709;
+  --color-warn-soft: #3a2d12;
+  --color-ink: #f5efe8;
+  --color-ink-muted: #aaa1b5;
+  --color-ink-faint: #6c6477;
+  --color-surface: #1e1b24;
+  --color-surface-2: #27232f;
+  --color-surface-3: #312c3a;
+  --color-canvas: #15131a;
+  --color-line: #37313f;
+  --color-line-dark: #2a2531;
+  --color-gold: #fbbf24;
+  --color-gold-dark: #b87a07;
+  --color-gold-soft: #3b3014;
+  --color-flame: #ff8a33;
+  --color-flame-soft: #3d2616;
+  --color-sky: #3aa8f5;
+  --color-sky-dark: #1273bd;
+  --color-sky-soft: #15324a;
+  --color-lacquer: #ea5a45;
+  --color-lacquer-dark: #a8301f;
+  --color-lacquer-soft: #3f1f1a;
+  --color-plum: #9d77f8;
+  --color-plum-dark: #6a44cf;
+  --color-plum-soft: #2d2442;
+  /* tones: brighter so they read on dark surfaces */
+  --color-tone-1: #fb6f8c;
+  --color-tone-2: #3fd07a;
+  --color-tone-3: #6aa6ff;
+  --color-tone-4: #c48cfb;
+  --color-tone-5: #a1a1aa;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 30px -16px rgb(0 0 0 / 0.7);
+  --shadow-float: 0 18px 40px -16px rgb(0 0 0 / 0.75);
+  --shadow-soft: 0 6px 18px -10px rgb(0 0 0 / 0.6);
+}
+:root { color-scheme: light; --tone-1: var(--color-tone-1); --tone-2: var(--color-tone-2); --tone-3: var(--color-tone-3); --tone-4: var(--color-tone-4); --tone-5: var(--color-tone-5); }
+:root[data-theme="dark"] { color-scheme: dark; }
 
 html, body, #root { height: 100%; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; background: var(--color-canvas); }
 body {
   margin: 0;
-  background: var(--color-surface);
+  background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
   overflow-x: clip;
   overscroll-behavior-y: none;
 }
 button { cursor: pointer; touch-action: manipulation; }
 button:disabled { cursor: default; }
+:focus-visible { outline: 3px solid color-mix(in oklab, var(--color-sky) 70%, transparent); outline-offset: 2px; }
+h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: -0.005em; }
 
 /* Safe-area helpers (iPhone notch / home indicator). */
 .pt-safe { padding-top: env(safe-area-inset-top); }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .px-safe { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 
+/* ── Chunky 3D surfaces ──
+   .btn-3d: set --face (background), --edge (bottom lip colour), optional --depth.
+   Pressing sinks the face onto its edge. */
+.btn-3d {
+  --depth: 4px;
+  position: relative;
+  background: var(--face);
+  box-shadow: 0 var(--depth) 0 var(--edge), 0 calc(var(--depth) + 8px) 16px -10px var(--glow, transparent), inset 0 2px 0 rgb(255 255 255 / var(--shine, 0.22));
+  transform: translateY(0);
+  transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, filter 0.15s;
+}
+.btn-3d:active:not(:disabled) { transform: translateY(var(--depth)); box-shadow: 0 0 0 var(--edge), inset 0 2px 0 rgb(255 255 255 / var(--shine, 0.22)); }
+.btn-3d:disabled { filter: saturate(0.3); opacity: 0.5; }
+
+/* Gloss highlight for coloured 3D faces (path nodes, badges). */
+.gloss::after {
+  content: ""; position: absolute; inset: 7% 18% auto 18%; height: 34%; border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.42), rgb(255 255 255 / 0));
+  pointer-events: none;
+}
+
+/* Subtle Chinese cloud pattern for banners (white, low alpha). */
+.pattern-clouds {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='44' viewBox='0 0 72 44'%3E%3Cpath d='M6 32c0-5 4-8 8-8 1-5 6-8 11-6 3-4 10-4 12 2 5-1 9 3 8 8' fill='none' stroke='white' stroke-opacity='.13' stroke-width='2.2' stroke-linecap='round'/%3E%3Ccircle cx='58' cy='11' r='3' fill='white' fill-opacity='.1'/%3E%3C/svg%3E");
+  background-size: 72px 44px;
+}
+
+/* Warm wash on the app canvas. */
+.canvas-bg {
+  background-color: var(--color-canvas);
+  background-image: radial-gradient(120% 60% at 0% 0%, color-mix(in oklab, var(--color-brand) 8%, transparent), transparent 60%),
+    radial-gradient(90% 50% at 100% 25%, color-mix(in oklab, var(--color-lacquer) 5%, transparent), transparent 60%);
+}
+
 /* Chunky range slider */
-input[type="range"].slider { -webkit-appearance: none; appearance: none; height: 10px; border-radius: 999px; background: var(--color-line); outline: none; }
-input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 999px; background: var(--color-brand); border: 3px solid #fff; box-shadow: 0 2px 0 var(--color-brand-dark), 0 0 0 1px var(--color-brand-dark); }
-input[type="range"].slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 999px; background: var(--color-brand); border: 3px solid #fff; box-shadow: 0 2px 0 var(--color-brand-dark); }
+input[type="range"].slider { -webkit-appearance: none; appearance: none; height: 10px; border-radius: 999px; background: var(--color-surface-3); outline: none; }
+input[type="range"].slider::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 999px; background: var(--color-brand); border: 4px solid var(--color-surface); box-shadow: 0 3px 0 var(--color-brand-dark), 0 0 0 1px var(--color-brand-dark); }
+input[type="range"].slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 999px; background: var(--color-brand); border: 4px solid var(--color-surface); box-shadow: 0 3px 0 var(--color-brand-dark); }
+
+/* Hide scrollbars on horizontal chip rows. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+/* App setting "Minska rörelse" (settings.reduceMotion) → html[data-reduce-motion]. */
+:root[data-reduce-motion] *, :root[data-reduce-motion] *::before, :root[data-reduce-motion] *::after {
+  animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important;
 }

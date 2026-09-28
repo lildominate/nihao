@@ -43,6 +43,8 @@ const normSv = (s: string) => s.trim().replace(/[.!?,]+$/, '').toLowerCase()
 const lessons = course.units.flatMap((u) => u.lessons)
 const words = Object.values(course.words)
 const sentences = Object.values(course.sentences)
+const dialogues = Object.values(course.dialogues ?? {})
+const lines = dialogues.flatMap((d) => d.lines.map((l, i) => ({ ...l, id: `${d.id}:${i}` })))
 
 describe('course structure', () => {
   it('has content', () => {
@@ -123,6 +125,7 @@ describe('pinyin & hanzi', () => {
   const items = [
     ...words.map((w) => ({ id: w.id, hanzi: w.hanzi, pinyin: w.pinyin })),
     ...sentences.map((s) => ({ id: s.id, hanzi: s.hanzi, pinyin: s.chunks.join(' ') })),
+    ...lines.map((l) => ({ id: l.id, hanzi: l.hanzi, pinyin: l.chunks.join(' ') })),
   ]
 
   it('has valid pinyin syllables (tone marks, lowercase except capitalised proper nouns)', () => {
@@ -164,6 +167,7 @@ describe('pinyin & hanzi', () => {
    */
   const ALLOW = new Set<string>([
     '了:le', // standalone 了 is read liǎo by pinyin-pro; our word is the particle le
+    '喂:wéi', // phone "hallå" is said wéi (rising); pinyin-pro gives the dictionary reading wèi
     'u2-l4-s2', // 一点中文: pinyin-pro reads 点中 as "diǎn zhòng" (hit); correct is Zhōng wén
   ])
 
@@ -176,12 +180,16 @@ describe('pinyin & hanzi', () => {
       const bad = ours.some((o, i) => {
         const r = ref[i]
         if (!r) return true
+        // per-character exceptions ("喂:wéi") apply wherever the character occurs
+        if (ALLOW.has(`${[...hanOnly][i]}:${syllablesOf(it.pinyin)[i].toLowerCase()}`)) return false
         if (o.base.replace(/ü/g, 'v') !== r.base.replace(/ü/g, 'v')) return true
         return o.tone !== 5 && r.tone !== 5 && o.tone !== r.tone
       })
       if (bad) {
         const key = `${hanOnly}:${it.pinyin.toLowerCase()}`
-        if (!ALLOW.has(key) && !ALLOW.has(`${it.id}`))
+        // 一点中文 anywhere: pinyin-pro segments 点中 as "diǎn zhòng" (hit); correct is Zhōng wén
+        const dianZhongwen = hanOnly.includes('点中文') && it.pinyin.includes('diǎn Zhōng wén')
+        if (!dianZhongwen && !ALLOW.has(key) && !ALLOW.has(`${it.id}`))
           mismatches.push(`${it.id}  ${hanOnly}  ours="${it.pinyin}"  pinyin-pro="${ref.map((r) => r.base + r.tone).join(' ')}"`)
       }
     }
@@ -216,5 +224,94 @@ describe('swedish', () => {
   it('has a tip in roughly every other lesson', () => {
     const standard = lessons.filter((l) => l.kind !== 'checkpoint')
     expect(standard.filter((l) => l.tip).length / standard.length).toBeGreaterThanOrEqual(0.5)
+  })
+})
+
+describe('dialogues & stories', () => {
+  const lessonIndex = new Map(lessons.map((l, i) => [l.id, i]))
+  /** word id → global index of the lesson that introduces it */
+  const introducedAt = new Map<string, number>()
+  lessons.forEach((l, i) => l.newWords.forEach((w) => introducedAt.set(w, i)))
+
+  it('has 2–3+ dialogues per unit and some stories', () => {
+    expect(dialogues.length).toBeGreaterThanOrEqual(20)
+    expect(dialogues.filter((d) => d.kind === 'story').length).toBeGreaterThanOrEqual(3)
+    for (const u of course.units) expect(u.dialogueIds?.length ?? 0, u.id).toBeGreaterThanOrEqual(2)
+  })
+
+  it('has ids matching record keys, each linked from exactly its own unit', () => {
+    const linked = new Map<string, string>()
+    for (const u of course.units) {
+      for (const id of u.dialogueIds ?? []) {
+        expect(linked.has(id), `${id} linked twice`).toBe(false)
+        linked.set(id, u.id)
+        expect(course.dialogues?.[id], `${u.id}: unknown dialogue ${id}`).toBeDefined()
+      }
+    }
+    for (const [k, d] of Object.entries(course.dialogues ?? {})) {
+      expect(d.id, k).toBe(k)
+      expect(d.id, k).toMatch(/^u\d+-d\d+$/)
+      expect(linked.get(k), `${k} not linked from its unit`).toBe(d.unitId)
+    }
+  })
+
+  it('unlocks after an existing lesson of its own unit', () => {
+    for (const d of dialogues) {
+      expect(lessonIndex.has(d.afterLessonId), `${d.id}: unknown lesson ${d.afterLessonId}`).toBe(true)
+      expect(d.afterLessonId.startsWith(`${d.unitId}-`), `${d.id}: ${d.afterLessonId} not in ${d.unitId}`).toBe(true)
+    }
+  })
+
+  it('has 4–10 lines, valid speakers and Swedish metadata', () => {
+    for (const d of dialogues) {
+      expect(d.lines.length, d.id).toBeGreaterThanOrEqual(4)
+      expect(d.lines.length, d.id).toBeLessThanOrEqual(10)
+      expect(d.title.trim() && d.context.trim(), d.id).toBeTruthy()
+      expect(d.speakers.A.trim() && d.speakers.B.trim(), d.id).toBeTruthy()
+      for (const l of d.lines) {
+        if (d.kind === 'story') expect(l.speaker, d.id).toBe('N')
+        else expect(['A', 'B'], d.id).toContain(l.speaker)
+        expect(l.sv.trim().length, d.id).toBeGreaterThan(0)
+      }
+      if (d.kind === 'dialogue') expect(new Set(d.lines.map((l) => l.speaker)).size, `${d.id} needs two speakers`).toBe(2)
+    }
+  })
+
+  it('only uses words introduced at or before afterLessonId', () => {
+    for (const d of dialogues) {
+      const at = lessonIndex.get(d.afterLessonId) ?? -1
+      d.lines.forEach((l, i) => {
+        expect(l.wordIds.length, `${d.id}:${i} has no words`).toBeGreaterThan(0)
+        for (const w of l.wordIds) {
+          expect(course.words[w], `${d.id}:${i}: unknown word ${w}`).toBeDefined()
+          const intro = introducedAt.get(w) ?? Infinity
+          expect(intro <= at, `${d.id}:${i} uses ${w} (introduced in ${lessons[intro]?.id}) before ${d.afterLessonId}`).toBe(true)
+        }
+      })
+    }
+  })
+
+  it('has well-formed chunks ("?" only as a final chunk, 1–12 tiles)', () => {
+    for (const l of lines) {
+      l.chunks.forEach((c, i) => {
+        expect(c.length > 0 && c === c.trim(), l.id).toBe(true)
+        if (PUNCT.has(c)) expect(i, `${l.id}: punctuation "${c}" not last`).toBe(l.chunks.length - 1)
+      })
+      const n = l.chunks.filter((c) => !PUNCT.has(c)).length
+      expect(n, l.id).toBeGreaterThanOrEqual(1)
+      expect(n, l.id).toBeLessThanOrEqual(12)
+    }
+  })
+})
+
+describe('chunk punctuation', () => {
+  it('keeps a mid-sentence comma visible on the preceding chunk (vocatives)', () => {
+    const bye = sentences.find((s) => s.hanzi === '老师，再见')
+    const hi = sentences.find((s) => s.hanzi === '老师好')
+    expect(bye?.chunks).toEqual(['lǎo shī ,', 'zài jiàn'])
+    expect(hi?.chunks).toEqual(['lǎo shī', 'hǎo'])
+    // the two must never be offered as each other's answers
+    const acc = (s: typeof hi) => new Set([s!.sv, ...(s!.svAlt ?? [])].map(normSv))
+    expect([...acc(bye)].some((x) => acc(hi).has(x))).toBe(false)
   })
 })

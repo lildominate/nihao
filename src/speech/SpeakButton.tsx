@@ -1,6 +1,7 @@
 // OWNER: Voice agent. Round speaker button that plays hanzi via TTS (with slow "turtle" variant).
 import { useEffect, useRef, useState } from 'react'
 import { speak } from './tts'
+import type { VoiceMode } from './tts'
 
 const SIZES = {
   sm: { btn: 'h-10 w-10', icon: 'h-5 w-5' },
@@ -44,22 +45,24 @@ export interface SpeakButtonProps {
   className?: string
   label?: string
   onEnd?: () => void
+  /** Voice selection, e.g. 'rotate' for multi-voice tone training. Default primary. */
+  voice?: VoiceMode
 }
 
 /** Duolingo-style round blue speaker button. */
-export function SpeakButton({ hanzi, size = 'md', slow = false, autoPlay = false, rate, className = '', label, onEnd }: SpeakButtonProps) {
+export function SpeakButton({ hanzi, size = 'md', slow = false, autoPlay = false, rate, className = '', label, onEnd, voice }: SpeakButtonProps) {
   const [speaking, setSpeaking] = useState(false)
   const mounted = useRef(true)
   const seq = useRef(0)
-  const latest = useRef({ hanzi, slow, rate, onEnd })
-  useEffect(() => { latest.current = { hanzi, slow, rate, onEnd } })
+  const latest = useRef({ hanzi, slow, rate, onEnd, voice })
+  useEffect(() => { latest.current = { hanzi, slow, rate, onEnd, voice } })
 
   const play = () => {
     const my = ++seq.current
-    const { hanzi: h, slow: s, rate: r, onEnd: done } = latest.current
+    const { hanzi: h, slow: s, rate: r, onEnd: done, voice: v } = latest.current
     setSpeaking(true)
     // speak() is called synchronously inside the click handler (required on iOS)
-    void speak(h, { slow: s, rate: r }).then(() => {
+    void speak(h, { slow: s, rate: r, voice: v }).then(() => {
       if (!mounted.current || my !== seq.current) return
       setSpeaking(false)
       done?.()

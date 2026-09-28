@@ -2,7 +2,7 @@
 import { useEffect, type ReactNode } from 'react'
 import type { Course, Exercise, ItemRef, Settings } from '../../types'
 import { PinyinText } from '../../speech/PinyinText'
-import { optionClass, sfx, type OptionState } from './util'
+import { optionClass, pickFx, PRESS, type OptionState } from './util'
 
 export interface Verdict {
   status: 'correct' | 'almost' | 'wrong'
@@ -12,6 +12,14 @@ export interface Verdict {
   heard?: string
   /** Extra line, e.g. "3:e tonen". */
   note?: string
+  /** One-line teaching explanation shown on a wrong/almost answer (e.g. which tone it was). */
+  explain?: string
+  /** Hanzi to replay in the feedback panel (defaults to the exercise audio). */
+  audio?: string
+  /** Headline override for the feedback panel (e.g. "Öva lite till"). */
+  title?: string
+  /** A gentle, self-reported miss (shadow "Öva igen"): neutral colours instead of red. Still re-queued. */
+  soft?: boolean
   /** match-pairs: items that were mismatched at least once. */
   mistakeItems?: ItemRef[]
 }
@@ -52,7 +60,7 @@ export function PromptCard({ children, className = '' }: { children: ReactNode; 
 }
 
 /** Vertical list of big answer buttons (also selectable with keys 1–9). */
-export function ChoiceList({ options, answer, selected, onSelect, verdict, render, settings }: {
+export function ChoiceList({ options, answer, selected, onSelect, verdict, render, settings, columns = 1 }: {
   options: string[]
   answer: string
   selected: string | null
@@ -60,6 +68,7 @@ export function ChoiceList({ options, answer, selected, onSelect, verdict, rende
   verdict: Verdict | null
   render?: (o: string) => ReactNode
   settings: Settings
+  columns?: 1 | 2
 }) {
   const locked = !!verdict
   useEffect(() => {
@@ -67,14 +76,14 @@ export function ChoiceList({ options, answer, selected, onSelect, verdict, rende
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       const n = Number(e.key)
-      if (n >= 1 && n <= options.length) { sfx(settings, 'tap'); onSelect(options[n - 1]) }
+      if (n >= 1 && n <= options.length) { pickFx(settings); onSelect(options[n - 1]) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [locked, options, onSelect, settings])
 
   return (
-    <div className="grid gap-3" role="radiogroup">
+    <div className={`grid gap-3 ${columns === 2 ? 'grid-cols-2' : ''}`} role="radiogroup">
       {options.map((o, i) => {
         let state: OptionState = selected === o ? 'selected' : 'idle'
         if (locked) state = o === answer ? 'right' : o === selected ? 'wrong' : 'dim'
@@ -85,11 +94,11 @@ export function ChoiceList({ options, answer, selected, onSelect, verdict, rende
             role="radio"
             aria-checked={selected === o}
             disabled={locked}
-            onClick={() => { sfx(settings, 'tap'); onSelect(o) }}
-            className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 border-b-4 px-4 py-3 text-left text-lg font-bold transition-colors active:translate-y-0.5 active:border-b-2 disabled:active:translate-y-0 disabled:active:border-b-4 ${optionClass(state)}`}
+            onClick={() => { pickFx(settings); onSelect(o) }}
+            className={`flex min-h-14 w-full items-center gap-3 rounded-2xl border-2 border-b-4 px-4 py-3 text-lg font-bold ${columns === 2 ? 'justify-center text-center' : 'text-left'} ${PRESS} ${optionClass(state)}`}
           >
-            <span className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-current/30 text-sm opacity-60 sm:inline-flex">{i + 1}</span>
-            <span className="min-w-0 flex-1 break-words">{render ? render(o) : o}</span>
+            {columns === 1 && <span className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-current/30 text-sm opacity-60 sm:inline-flex">{i + 1}</span>}
+            <span className={`min-w-0 break-words ${columns === 1 ? 'flex-1' : ''}`}>{render ? render(o) : o}</span>
           </button>
         )
       })}

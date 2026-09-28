@@ -1,10 +1,54 @@
 // Item lookup helpers shared by the generator and UI (pure).
-import type { Course, Exercise, ItemRef, Sentence, Word } from '../types'
+import type { Course, Dialogue, DialogueLine, Exercise, ItemRef, Sentence, Word } from '../types'
 import { norm, normSv, syllables } from './pinyinUtil'
 
 export const wordRef = (id: string): ItemRef => ({ kind: 'word', id })
 export const sentenceRef = (id: string): ItemRef => ({ kind: 'sentence', id })
 export const itemKey = (r: ItemRef) => `${r.kind}:${r.id}`
+/** v2: dialogue line ref, id = `${dialogueId}:${lineIndex}`. */
+export const lineRef = (dialogueId: string, index: number): ItemRef => ({ kind: 'line', id: `${dialogueId}:${index}` })
+
+export function parseLineId(id: string): { dialogueId: string; index: number } | null {
+  const at = id.lastIndexOf(':')
+  if (at <= 0) return null
+  const index = Number(id.slice(at + 1))
+  if (!Number.isInteger(index) || index < 0) return null
+  return { dialogueId: id.slice(0, at), index }
+}
+
+export function getLine(course: Course, r: ItemRef): { dialogue: Dialogue; line: DialogueLine; index: number } | undefined {
+  if (r.kind !== 'line') return undefined
+  const p = parseLineId(r.id)
+  if (!p) return undefined
+  const dialogue = course.dialogues?.[p.dialogueId]
+  const line = dialogue?.lines[p.index]
+  return dialogue && line ? { dialogue, line, index: p.index } : undefined
+}
+
+/** Does the item exist in the course? */
+export function itemExists(course: Course, r: ItemRef): boolean {
+  if (r.kind === 'word') return !!course.words[r.id]
+  if (r.kind === 'sentence') return !!course.sentences[r.id]
+  return !!getLine(course, r)
+}
+
+/** Pinyin chunks of a sentence or dialogue line (a word → its pinyin as one chunk). */
+export function itemChunks(course: Course, r: ItemRef): string[] {
+  if (r.kind === 'sentence') return course.sentences[r.id]?.chunks ?? []
+  if (r.kind === 'line') return getLine(course, r)?.line.chunks ?? []
+  const w = course.words[r.id]
+  return w ? [w.pinyin] : []
+}
+
+/**
+ * v2 audio hint on an exercise (progress-local extension of the shared Exercise
+ * union, which is lead-owned). 'rotate' = play this prompt with a different
+ * available zh voice each time (high-variability phonetic training). The
+ * generator sets it on tone-pick when `multiVoice` is on; players may ignore it.
+ */
+export type VoiceHint = { voice?: 'rotate' }
+export type HintedExercise = Exercise & VoiceHint
+export const voiceHint = (ex: Exercise): 'rotate' | undefined => (ex as HintedExercise).voice
 
 export function getWord(course: Course, r: ItemRef): Word | undefined {
   return r.kind === 'word' ? course.words[r.id] : undefined
@@ -20,6 +64,11 @@ export function itemInfo(course: Course, r: ItemRef): ItemInfo {
     const w = course.words[r.id]
     if (!w) return { hanzi: '', pinyin: r.id, sv: r.id, svAll: [r.id] }
     return { hanzi: w.hanzi, pinyin: w.pinyin, sv: w.sv, svAll: [w.sv, ...(w.svAlt ?? [])] }
+  }
+  if (r.kind === 'line') {
+    const l = getLine(course, r)?.line
+    if (!l) return { hanzi: '', pinyin: r.id, sv: r.id, svAll: [r.id] }
+    return { hanzi: l.hanzi, pinyin: l.chunks.join(' '), sv: l.sv, svAll: [l.sv] }
   }
   const s = course.sentences[r.id]
   if (!s) return { hanzi: '', pinyin: r.id, sv: r.id, svAll: [r.id] }

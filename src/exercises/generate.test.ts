@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { Exercise } from '../types'
+import type { Course, Exercise, ItemRef } from '../types'
 import { fixtureCourse as course } from './fixture.test-data'
-import { generateLessonExercises, generateReviewExercises, generateToneDrill, spreadOut } from './generate'
-import { itemInfo, itemKey, syllableHanzi } from './items'
+import { confusablePinyin, confusableSv, generateLessonExercises, generateReviewExercises, generateToneDrill, preferredTypes, spreadOut, unlockedReplyLines } from './generate'
+import { itemInfo, itemKey, syllableHanzi, voiceHint } from './items'
 import { checkBuild } from './check'
 import { syllableBase, syllableTone, withTone } from './pinyinUtil'
 
@@ -189,6 +189,229 @@ describe('spreadOut', () => {
     const w = (id: string): Exercise => ({ type: 'type-pinyin', item: { kind: 'word', id } })
     const out = spreadOut([w('a'), w('a'), w('b'), w('c')])
     assertNoBackToBack(out)
+  })
+})
+
+// ─── v2 pedagogy ─────────────────────────────────────────────
+
+const v2course: Course = {
+  ...course,
+  words: {
+    ...course.words,
+    'lao-shi': { id: 'lao-shi', hanzi: '老师', pinyin: 'lǎo shī', sv: 'lärare', pos: 'noun' },
+  },
+  sentences: {
+    ...course.sentences,
+    's-ls-hao': { id: 's-ls-hao', hanzi: '老师好', chunks: ['lǎo shī', 'hǎo'], sv: 'Hej lärare', svChunks: ['Hej', 'lärare'], wordIds: ['lao-shi', 'hao'] },
+    's-ls-zj': { id: 's-ls-zj', hanzi: '老师，再见', chunks: ['lǎo shī', 'zài jiàn'], sv: 'Hej då lärare', svChunks: ['Hej', 'då', 'lärare'], wordIds: ['lao-shi', 'zai-jian'] },
+  },
+  dialogues: {
+    'u1-d1': {
+      id: 'u1-d1', unitId: 'u1', kind: 'dialogue', title: 'Hej', context: 'Du möter en vän.', speakers: { A: 'Du', B: 'Vännen' }, afterLessonId: 'u1-l1',
+      lines: [
+        { speaker: 'A', hanzi: '你好', chunks: ['nǐ hǎo'], sv: 'Hej', wordIds: ['ni-hao'] },
+        { speaker: 'B', hanzi: '你好吗？', chunks: ['nǐ', 'hǎo', 'ma', '?'], sv: 'Hur mår du?', wordIds: ['ni', 'hao', 'ma'] },
+        { speaker: 'A', hanzi: '我喝茶', chunks: ['wǒ', 'hē', 'chá'], sv: 'Jag dricker te', wordIds: ['wo', 'he', 'cha'] },
+        { speaker: 'B', hanzi: '他吃饭', chunks: ['tā', 'chī', 'fàn'], sv: 'Han äter', wordIds: ['ta', 'chi', 'fan'] },
+      ],
+    },
+    'u1-d2': {
+      id: 'u1-d2', unitId: 'u1', kind: 'dialogue', title: 'Hej då', context: 'Lektionen slutar.', speakers: { A: 'Du', B: 'Läraren' }, afterLessonId: 'u1-l2',
+      lines: [
+        { speaker: 'B', hanzi: '谢谢', chunks: ['xiè xie'], sv: 'Tack', wordIds: ['xie-xie'] },
+        { speaker: 'A', hanzi: '再见', chunks: ['zài jiàn'], sv: 'Hej då', wordIds: ['zai-jian'] },
+      ],
+    },
+  },
+}
+
+function assertV2Valid(c: Course, ex: Exercise[]) {
+  for (const e of ex) {
+    if (e.type === 'fill-blank' || e.type === 'dialogue-reply') {
+      expect(e.options).toContain(e.answer)
+      expect(new Set(e.options.map((o) => o.toLowerCase())).size).toBe(e.options.length)
+      expect(e.options.length).toBeGreaterThanOrEqual(3)
+    }
+    if (e.type === 'fill-blank' && e.item.kind === 'sentence') expect(c.sentences[e.item.id].chunks[e.blankIndex]).toBe(e.answer)
+    if (e.type === 'dialogue-reply') {
+      expect(e.item.kind).toBe('line')
+      expect(itemInfo(c, e.item).pinyin).toBe(e.answer)
+    }
+    if (e.type === 'listen-build') {
+      const chunks = e.item.kind === 'sentence' ? c.sentences[e.item.id].chunks : c.dialogues![e.item.id.split(':')[0]].lines[Number(e.item.id.split(':')[1])].chunks
+      const rest = [...e.tiles]
+      for (const ch of chunks) {
+        const at = rest.indexOf(ch)
+        expect(at, `chunk ${ch}`).toBeGreaterThanOrEqual(0)
+        rest.splice(at, 1)
+      }
+      // distractors: 2–3, never equal to a real chunk (content may legitimately repeat a chunk)
+      expect(rest.length).toBeGreaterThanOrEqual(2)
+      const bare = (t: string) => t.toLowerCase().replace(/[?!,.]/g, '').trim()
+      for (const x of rest) expect(chunks.map(bare)).not.toContain(bare(x))
+    }
+  }
+}
+
+describe('confusability', () => {
+  it('flags look-alike pinyin and Swedish', () => {
+    expect(confusablePinyin('lǎo shī hǎo', 'lǎo shī , zài jiàn')).toBe(true)
+    expect(confusablePinyin('mā', 'mǎ')).toBe(true)
+    expect(confusablePinyin('wǒ hē shuǐ', 'tā chī fàn')).toBe(false)
+    expect(confusableSv('Hej lärare', 'Hej då lärare')).toBe(true)
+    expect(confusableSv('te', 'mat')).toBe(false)
+  })
+  it('keeps confusable sentences out of the same question', () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const ex = generateReviewExercises([{ kind: 'sentence', id: 's-ls-hao' }], v2course, { seed, mastery: () => 0 })
+      for (const e of ex) {
+        if ('options' in e) {
+          expect(e.options).not.toContain('lǎo shī zài jiàn')
+          expect(e.options).not.toContain('Hej då lärare')
+        }
+      }
+    }
+  })
+})
+
+describe('adaptive by mastery', () => {
+  const l = lesson('u1-l1')
+  const types = (ex: Exercise[]) => new Set(ex.map((e) => e.type))
+
+  it('mastery 0 → intros + recognition first; 4–5 → production, no intros', () => {
+    const low = generateLessonExercises(l, v2course, { seed: 3, mastery: () => 0 })
+    expect(low.filter((e) => e.type === 'intro')).toHaveLength(l.newWords.length)
+    const high = generateLessonExercises(l, v2course, { seed: 3, speaking: true, mastery: () => 5 })
+    expect(high.some((e) => e.type === 'intro')).toBe(false)
+    const prod = high.filter((e) => ['type-pinyin', 'speak', 'shadow', 'listen-build', 'build-pinyin', 'sv-to-pinyin'].includes(e.type)).length
+    expect(prod / scored(high).length).toBeGreaterThan(0.6)
+    expect(types(high)).toContain('listen-build')
+    expect(types(high)).toContain('shadow')
+  })
+
+  it('mastery 2–3 → no intros, fill-blank appears', () => {
+    const mid = generateLessonExercises(lesson('u1-l2'), v2course, { seed: 4, mastery: () => 2 })
+    expect(mid.some((e) => e.type === 'intro')).toBe(false)
+    expect(types(mid)).toContain('fill-blank')
+    assertV2Valid(v2course, mid)
+  })
+
+  it('preferredTypes follows the stage table', () => {
+    const top = (k: ItemRef['kind'], m: number) => [...preferredTypes(k, m, true)].sort((a, b) => b[1] - a[1])[0][0]
+    expect(top('word', 0)).toMatch(/listen-choose|pinyin-to-sv/)
+    expect(top('word', 5)).toBe('type-pinyin')
+    expect(top('sentence', 2)).toMatch(/fill-blank|build-pinyin/)
+    expect(top('sentence', 4)).toBe('listen-build')
+    expect(top('line', 1)).toBe('dialogue-reply')
+    expect(preferredTypes('sentence', 5, false).find(([t]) => t === 'shadow')![1]).toBe(0)
+  })
+
+  it('review exercises adapt to mastery', () => {
+    const items: ItemRef[] = ['shui', 'cha', 'wo', 'he', 'fan', 'chi'].map((id) => ({ kind: 'word', id }))
+    const low = generateReviewExercises(items, v2course, { seed: 1, mastery: () => 0 })
+    const high = generateReviewExercises(items, v2course, { seed: 1, mastery: () => 5 })
+    const recog = (ex: Exercise[]) => ex.filter((e) => e.type === 'listen-choose' || e.type === 'pinyin-to-sv').length
+    expect(recog(low)).toBeGreaterThan(recog(high))
+    expect(high.filter((e) => e.type === 'type-pinyin').length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('interleaved review', () => {
+  const review: ItemRef[] = [
+    { kind: 'word', id: 'shui' }, { kind: 'word', id: 'cha' }, { kind: 'word', id: 'fan' },
+    { kind: 'sentence', id: 's-wo-he-shui' }, { kind: 'word', id: 'chi' }, { kind: 'word', id: 'he' }, { kind: 'word', id: 'ta' },
+  ]
+  it('~20–30 % of scored exercises are review items, spread out, lesson stays valid', () => {
+    const reviewKeys = new Set(review.map(itemKey))
+    for (let seed = 0; seed < 20; seed++) {
+      const ex = generateLessonExercises(lesson('u1-l1'), v2course, { seed, reviewItems: review, mastery: (r) => (r.id === 'shui' ? 3 : 0) })
+      const s = scored(ex)
+      const nRev = s.filter((e) => e.type !== 'match-pairs' && reviewKeys.has(itemKey(e.item))).length
+      expect(nRev / s.length).toBeGreaterThanOrEqual(0.2)
+      expect(nRev / s.length).toBeLessThanOrEqual(0.3)
+      expect(s.length).toBeLessThanOrEqual(18)
+      assertNoBackToBack(ex)
+      assertValidOptions(ex)
+      const positions = ex.map((e, i) => (e.type !== 'match-pairs' && reviewKeys.has(itemKey(e.item)) ? i : -1)).filter((i) => i >= 0)
+      expect(positions[0]).toBeLessThan(ex.length - positions.length) // not bunched at the end
+    }
+  })
+  it('skips review items that are part of the lesson and unknown items', () => {
+    const ex = generateLessonExercises(lesson('u1-l1'), v2course, { seed: 1, reviewItems: [{ kind: 'word', id: 'wo' }, { kind: 'word', id: 'nope' }, { kind: 'line', id: 'zz:1' }] })
+    const plain = generateLessonExercises(lesson('u1-l1'), v2course, { seed: 1 })
+    expect(scored(ex).length).toBe(scored(plain).length)
+  })
+})
+
+describe('dialogues', () => {
+  it('unlocks reply lines only after afterLessonId', () => {
+    expect(unlockedReplyLines(v2course, 'u1-l2', [])).toEqual([])
+    const lines = unlockedReplyLines(v2course, 'u1-l2', ['u1-l1'])
+    expect(lines.map((r) => r.id)).toEqual(['u1-d1:1', 'u1-d1:2', 'u1-d1:3'])
+    expect(unlockedReplyLines({ ...v2course, dialogues: undefined }, 'u1-l2', ['u1-l1'])).toEqual([])
+  })
+  it('adds dialogue-reply to lessons once unlocked; valid options', () => {
+    for (let seed = 0; seed < 15; seed++) {
+      const ex = generateLessonExercises(lesson('u1-l2'), v2course, { seed, completedLessonIds: ['u1-l1'] })
+      expect(ex.some((e) => e.type === 'dialogue-reply')).toBe(true)
+      assertV2Valid(v2course, ex)
+      assertNoBackToBack(ex)
+      expect(scored(ex).length).toBeLessThanOrEqual(18)
+    }
+    const locked = generateLessonExercises(lesson('u1-l2'), v2course, { seed: 1 })
+    expect(locked.some((e) => e.type === 'dialogue-reply')).toBe(false)
+  })
+  it('reviews line items (dialogue-reply / listen-build / fill-blank / shadow)', () => {
+    const items: ItemRef[] = [{ kind: 'line', id: 'u1-d1:1' }, { kind: 'line', id: 'u1-d1:2' }, { kind: 'line', id: 'u1-d1:3' }]
+    for (const m of [0, 2, 5]) {
+      const ex = generateReviewExercises(items, v2course, { seed: 2, speaking: true, mastery: () => m })
+      expect(ex).toHaveLength(3)
+      for (const e of ex) expect(['dialogue-reply', 'listen-build', 'fill-blank', 'shadow']).toContain(e.type)
+      assertV2Valid(v2course, ex)
+    }
+  })
+})
+
+describe('real course (v2 content) × adaptive generator', () => {
+  it('every lesson stays valid with dialogues unlocked, review interleaving and mixed mastery', async () => {
+    const { course: real } = await import('../data/course')
+    const lessons = real.units.flatMap((u) => u.lessons)
+    const done: string[] = []
+    const allLines: ItemRef[] = Object.values(real.dialogues ?? {}).flatMap((d) => d.lines.map((_, i) => ({ kind: 'line' as const, id: `${d.id}:${i}` })))
+    let dialogueReplies = 0
+    lessons.forEach((l, li) => {
+      const known = lessons.slice(0, li).flatMap((x) => x.newWords)
+      const reviewItems: ItemRef[] = [...known.slice(-6).map((id) => ({ kind: 'word' as const, id })), ...allLines.slice(li % 7, li % 7 + 2)]
+      const mastery = (r: ItemRef) => (r.id.length + li) % 6
+      const ex = generateLessonExercises(l, real, { seed: li, speaking: li % 2 === 0, knownWordIds: known, completedLessonIds: done, reviewItems, mastery, multiVoice: true })
+      const s = scored(ex)
+      expect(s.length, l.id).toBeGreaterThanOrEqual(6)
+      expect(s.length, l.id).toBeLessThanOrEqual(20)
+      assertNoBackToBack(ex)
+      assertV2Valid(real, ex)
+      for (const e of ex) {
+        for (const it of e.type === 'match-pairs' ? e.items : [e.item]) {
+          const ok = it.kind === 'word' ? real.words[it.id] : it.kind === 'sentence' ? real.sentences[it.id] : itemInfo(real, it).hanzi
+          expect(ok, `${l.id} ${e.type} → ${it.kind}:${it.id}`).toBeTruthy()
+        }
+        if ('options' in e) expect(e.options).toContain(e.answer)
+        if (e.type === 'fill-blank') expect(e.answer).not.toMatch(/[,!?.]/)
+      }
+      dialogueReplies += ex.filter((e) => e.type === 'dialogue-reply').length
+      done.push(l.id)
+    })
+    if (Object.keys(real.dialogues ?? {}).length) expect(dialogueReplies).toBeGreaterThan(0)
+  })
+})
+
+describe('multi-voice hints', () => {
+  it('tone-picks get voice: rotate only when multiVoice is on', () => {
+    const on = generateToneDrill(['ni-hao', 'shui', 'cha'], course, 6, { seed: 1, multiVoice: true })
+    expect(on.every((e) => voiceHint(e) === 'rotate')).toBe(true)
+    const off = generateToneDrill(['ni-hao', 'shui', 'cha'], course, 6, { seed: 1 })
+    expect(off.some((e) => voiceHint(e))).toBe(false)
+    const lessonEx = generateLessonExercises(lesson('u1-t'), course, { seed: 1, multiVoice: true })
+    for (const e of lessonEx) expect(voiceHint(e) === 'rotate').toBe(e.type === 'tone-pick')
   })
 })
 

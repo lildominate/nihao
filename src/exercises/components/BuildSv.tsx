@@ -15,7 +15,7 @@ export function BuildSv({ ex, course, settings, verdict, setChecker }: ExProps<'
     setChecker(picked.length === 0 ? null : () =>
       checkBuild('build-sv', s, picked.map((i) => ex.tiles[i]))
         ? { status: 'correct' }
-        : { status: 'wrong', answer: { text: s.sv } })
+        : { status: 'wrong', answer: { text: s.sv, pinyin: s.chunks.join(' ') } })
   }, [picked, ex, s, setChecker])
 
   return (

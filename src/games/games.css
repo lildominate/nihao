@@ -1,0 +1,33 @@
+/* OWNER: Games agent. Keyframes for Spelhallen (compositor-only: transform/opacity). */
+@keyframes g-shake { 0%, 100% { transform: translateX(0) } 20% { transform: translateX(-7px) } 40% { transform: translateX(7px) } 60% { transform: translateX(-4px) } 80% { transform: translateX(4px) } }
+@keyframes g-pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.08); opacity: 1 } 100% { transform: scale(1) } }
+@keyframes g-bump { 0% { transform: scale(1) } 40% { transform: scale(1.25) } 100% { transform: scale(1) } }
+@keyframes g-float { from { transform: translate(-50%, 0) scale(.9); opacity: 1 } to { transform: translate(-50%, -64px) scale(1.15); opacity: 0 } }
+@keyframes g-in { from { transform: translateY(16px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes g-glow { 0%, 100% { opacity: .55 } 50% { opacity: 1 } }
+@keyframes g-drift { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-5px) } }
+@keyframes g-ring { from { transform: scale(.4); opacity: .9 } to { transform: scale(2.2); opacity: 0 } }
+
+.g-shake { animation: g-shake .38s ease-in-out both }
+.g-pop { animation: g-pop .34s cubic-bezier(.34, 1.56, .64, 1) both }
+.g-bump { animation: g-bump .28s ease-out both }
+.g-float { animation: g-float .8s ease-out forwards }
+.g-in { animation: g-in .3s cubic-bezier(.22, 1, .36, 1) both }
+.g-glow { animation: g-glow 1.6s ease-in-out infinite }
+.g-drift { animation: g-drift 3s ease-in-out infinite }
+.g-ring { animation: g-ring .6s ease-out forwards }
+
+/* Memory card flip */
+.g-card { perspective: 700px }
+.g-card-inner { position: relative; width: 100%; height: 100%; transition: transform .36s cubic-bezier(.22, 1, .36, 1); transform-style: preserve-3d }
+.g-card-inner.is-up { transform: rotateY(180deg) }
+.g-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden }
+.g-face-front { transform: rotateY(180deg) }
+
+.g-noselect { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none }
+
+@media (prefers-reduced-motion: reduce) {
+  .g-card-inner { transition: none }
+}
+.g-reduced .g-shake, .g-reduced .g-pop, .g-reduced .g-bump, .g-reduced .g-in, .g-reduced .g-drift, .g-reduced .g-glow { animation: none }
+.g-reduced .g-card-inner { transition: none }

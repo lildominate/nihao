@@ -8,6 +8,12 @@ import { unlockSpeech } from './tts'
  * stopSpeaking(), hasChineseVoice(), setDefaultSpeechRate(rate) (call with settings.speechRate).
  */
 export { speak, stopSpeaking, hasChineseVoice, setDefaultSpeechRate, chineseVoiceName, isSpeechSynthesisAvailable, unlockSpeech, isIOS } from './tts'
+/**
+ * v2 multi-voice: speak(hanzi, { voice: 'auto' | 'primary' | 'rotate' }) — default 'primary'.
+ * 'auto' rotates between good Mandarin voices when setMultiVoice(settings.multiVoice ?? true) is on.
+ */
+export { listChineseVoices, setMultiVoice, isMultiVoiceEnabled, lastVoiceName, speakSwedish, hasSwedishVoice } from './tts'
+export type { ChineseVoiceInfo, VoiceMode, SpeakOptions } from './tts'
 
 /**
  * listenAndCheck(expected, { timeoutMs? }) — listen via mic (zh-CN) and compare to the expected item.
@@ -18,12 +24,23 @@ export { isRecognitionAvailable, listenAndCheck, stopListening, recognizeOnce, r
 export type { SpeechErrorCode } from './recognition'
 export type { SpokenCheck } from './score'
 
-export { playSfx, unlockAudio } from './sfx'
+export { playSfx, unlockAudio, getAudioContext, setAudioSessionType } from './sfx'
 export type { Sfx } from './sfx'
 
 export { PinyinText } from './PinyinText'
 export { SpeakButton } from './SpeakButton'
 export { MicButton } from './MicButton'
+
+// v2 tone meter: YIN pitch tracking from the mic + contour analysis + canvas.
+export { detectPitch } from './pitch/yin'
+export type { PitchEstimate } from './pitch/yin'
+export { analyzeAttempt, classifyContour, scoreTone, surfaceTones, toneTargets, idealContour, hzToSt, SHAPE_SV } from './pitch/contour'
+export type { AttemptResult, SyllableResult, SyllableTarget, PitchFrame, PitchRange, ToneShape } from './pitch/contour'
+export { startPitchTracking, pitchTrackingSupport, isPitchTrackingAvailable, MicError, loadPitchRange, savePitchRange } from './pitch/mic'
+export type { PitchTracker, MicErrorCode } from './pitch/mic'
+export { ToneCanvas } from './ToneCanvas'
+export type { LivePoint } from './ToneCanvas'
+export { useToneRecorder, recordingMs } from './useToneRecorder'
 
 export type { Tone }
 

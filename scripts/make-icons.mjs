@@ -1,106 +1,152 @@
-// Generates the app icons (SVG + PNG) in public/ using only Node built-ins.
-// Run: node scripts/make-icons.mjs
+// Generates the app icons (SVG + PNG) and iOS launch images in public/, using only Node built-ins.
+// The icon is Pānpan's face on a jade tile. Run: node scripts/make-icons.mjs
 import { deflateSync } from 'node:zlib'
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public')
-const BG = '#22c55e', BG_DARK = '#16a34a', WHITE = '#ffffff'
-const TONES = ['#e11d48', '#16a34a', '#2563eb', '#9333ea']
-const SW = 13 // stroke radius (half width) of tone marks
+const BG = '#12a179', BG_LIGHT = '#3fcf9f', BG_DARK = '#0a7a5a'
+const CANVAS = '#fbf5ec'
+const INK = '#2b2533', INK_2 = '#57506a', WHITE = '#ffffff', BLUSH = '#ff9aa6', SCARF = '#d9412e', JADE = '#2fbf8f'
 
-// Geometry in a 512×512 design space: speech bubble + the four tone marks.
-const bubble = { x: 72, y: 120, w: 368, h: 236, r: 72 }
-const tail = [[150, 344], [240, 344], [124, 420]]
-const marks = [
-  { c: TONES[0], pts: [[109, 238], [153, 238]] },
-  { c: TONES[1], pts: [[203, 266], [231, 210]] },
-  { c: TONES[2], pts: [[281, 212], [303, 264], [325, 212]] },
-  { c: TONES[3], pts: [[375, 210], [403, 266]] },
+// ── Geometry (512×512 design space), painted in order ─────────
+// kinds: circle {cx,cy,r} · ellipse {cx,cy,rx,ry,rot(deg)} · line {pts,w} (round caps)
+const SHAPES = [
+  { k: 'ellipse', cx: 256, cy: 540, rx: 170, ry: 130, rot: 0, c: WHITE },           // body
+  { k: 'ellipse', cx: 256, cy: 432, rx: 150, ry: 34, rot: 0, c: SCARF },            // red-lacquer scarf
+  { k: 'circle', cx: 256, cy: 456, r: 17, c: JADE },
+  { k: 'circle', cx: 148, cy: 142, r: 62, c: INK }, { k: 'circle', cx: 150, cy: 148, r: 28, c: INK_2 },
+  { k: 'circle', cx: 364, cy: 142, r: 62, c: INK }, { k: 'circle', cx: 362, cy: 148, r: 28, c: INK_2 },
+  { k: 'ellipse', cx: 256, cy: 270, rx: 184, ry: 156, rot: 0, c: WHITE },
+  { k: 'ellipse', cx: 182, cy: 276, rx: 46, ry: 60, rot: 38, c: INK },
+  { k: 'ellipse', cx: 330, cy: 276, rx: 46, ry: 60, rot: -38, c: INK },
+  { k: 'ellipse', cx: 132, cy: 344, rx: 32, ry: 19, rot: 0, c: BLUSH },
+  { k: 'ellipse', cx: 380, cy: 344, rx: 32, ry: 19, rot: 0, c: BLUSH },
+  { k: 'circle', cx: 188, cy: 270, r: 26, c: WHITE }, { k: 'circle', cx: 188, cy: 272, r: 18, c: INK }, { k: 'circle', cx: 195, cy: 264, r: 7, c: WHITE },
+  { k: 'circle', cx: 324, cy: 270, r: 26, c: WHITE }, { k: 'circle', cx: 324, cy: 272, r: 18, c: INK }, { k: 'circle', cx: 331, cy: 264, r: 7, c: WHITE },
+  { k: 'ellipse', cx: 256, cy: 322, rx: 22, ry: 15, rot: 0, c: INK },
+  { k: 'line', pts: Array.from({ length: 9 }, (_, i) => { const t = i / 8; return [230 + 52 * t, 354 + 64 * t * (1 - t)] }), w: 9, c: INK },
 ]
 
 // ── SVG ───────────────────────────────────────────────────────
-function svg({ maskable = false, rounded = true } = {}) {
-  const s = maskable ? 0.78 : 1
-  const t = `translate(${256 - 256 * s} ${256 - 256 * s + (maskable ? 4 : 0)}) scale(${s})`
-  const bg = rounded && !maskable
-    ? `<rect width="512" height="512" rx="112" fill="${BG}"/><rect y="440" width="512" height="72" rx="0" fill="${BG_DARK}" clip-path="url(#c)"/>`
-    : `<rect width="512" height="512" fill="${BG}"/>`
-  const defs = rounded && !maskable ? `<defs><clipPath id="c"><rect width="512" height="512" rx="112"/></clipPath></defs>` : ''
-  const lines = marks.map(m => `<polyline points="${m.pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="${m.c}" stroke-width="${SW * 2}" stroke-linecap="round" stroke-linejoin="round"/>`).join('')
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">${defs}${bg}<g transform="${t}"><rect x="${bubble.x}" y="${bubble.y}" width="${bubble.w}" height="${bubble.h}" rx="${bubble.r}" fill="${WHITE}"/><polygon points="${tail.map(p => p.join(',')).join(' ')}" fill="${WHITE}"/>${lines}</g></svg>\n`
+function shapeSvg(s) {
+  if (s.k === 'circle') return `<circle cx="${s.cx}" cy="${s.cy}" r="${s.r}" fill="${s.c}"/>`
+  if (s.k === 'ellipse') return `<ellipse cx="${s.cx}" cy="${s.cy}" rx="${s.rx}" ry="${s.ry}"${s.rot ? ` transform="rotate(${s.rot} ${s.cx} ${s.cy})"` : ''} fill="${s.c}"/>`
+  return `<polyline points="${s.pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="${s.c}" stroke-width="${s.w * 2}" stroke-linecap="round" stroke-linejoin="round"/>`
+}
+function svg({ maskable = false } = {}) {
+  const s = maskable ? 0.8 : 0.92
+  const t = `translate(${256 - 256 * s} ${256 - 256 * s + 10}) scale(${s})`
+  const clip = maskable ? '' : '<clipPath id="c"><rect width="512" height="512" rx="112"/></clipPath>'
+  const bg = `<rect width="512" height="512" ${maskable ? '' : 'rx="112"'} fill="url(#g)"/>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><radialGradient id="g" cx="30%" cy="18%" r="95%"><stop offset="0" stop-color="${BG_LIGHT}"/><stop offset=".55" stop-color="${BG}"/><stop offset="1" stop-color="${BG_DARK}"/></radialGradient>${clip}</defs>${bg}<g${maskable ? '' : ' clip-path="url(#c)"'}><g transform="${t}">${SHAPES.map(shapeSvg).join('')}</g></g></svg>\n`
 }
 
 // ── Raster ────────────────────────────────────────────────────
-const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16))
+const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t)
 function inRoundRect(x, y, rx, ry, rw, rh, r) {
   const cx = Math.max(rx + r, Math.min(x, rx + rw - r))
   const cy = Math.max(ry + r, Math.min(y, ry + rh - r))
   return x >= rx && x <= rx + rw && y >= ry && y <= ry + rh && (x - cx) ** 2 + (y - cy) ** 2 <= r * r
-}
-function inTri(x, y, [a, b, c]) {
-  const s = (p, q) => (x - q[0]) * (p[1] - q[1]) - (p[0] - q[0]) * (y - q[1])
-  const d1 = s(a, b), d2 = s(b, c), d3 = s(c, a)
-  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))
 }
 function segDist(x, y, [ax, ay], [bx, by]) {
   const dx = bx - ax, dy = by - ay
   const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
   return Math.hypot(x - ax - t * dx, y - ay - t * dy)
 }
-function sample(x, y, { maskable, rounded, s }) {
-  // background
-  let col = null
-  if (!rounded || maskable) col = BG
-  else if (inRoundRect(x, y, 0, 0, 512, 512, 112)) col = y > 440 ? BG_DARK : BG
-  if (!col) return null
-  // content space
-  const u = (x - (256 - 256 * s)) / s, v = (y - (256 - 256 * s + (maskable ? 4 : 0))) / s
-  for (const m of marks) for (let i = 0; i < m.pts.length - 1; i++) if (segDist(u, v, m.pts[i], m.pts[i + 1]) <= SW) return m.c
-  if (inRoundRect(u, v, bubble.x, bubble.y, bubble.w, bubble.h, bubble.r) || inTri(u, v, tail)) return WHITE
-  return col
+function hit(s, u, v) {
+  if (s.k === 'circle') return (u - s.cx) ** 2 + (v - s.cy) ** 2 <= s.r * s.r
+  if (s.k === 'ellipse') {
+    const a = (-s.rot * Math.PI) / 180, x = u - s.cx, y = v - s.cy
+    const xr = x * Math.cos(a) - y * Math.sin(a), yr = x * Math.sin(a) + y * Math.cos(a)
+    return (xr / s.rx) ** 2 + (yr / s.ry) ** 2 <= 1
+  }
+  for (let i = 0; i < s.pts.length - 1; i++) if (segDist(u, v, s.pts[i], s.pts[i + 1]) <= s.w) return true
+  return false
 }
-function raster(size, opts) {
+/** Colour of the panda at design-space (u,v), or null if none. */
+function panda(u, v) {
+  let c = null
+  for (const s of SHAPES) if (hit(s, u, v)) c = s.c
+  return c
+}
+const BG_RGB = [hex(BG_LIGHT), hex(BG), hex(BG_DARK)]
+function tileBg(x, y) {
+  const d = Math.min(1, Math.hypot(x - 154, y - 92) / 486)
+  return d < 0.55 ? lerp(BG_RGB[0], BG_RGB[1], d / 0.55) : lerp(BG_RGB[1], BG_RGB[2], (d - 0.55) / 0.45)
+}
+function iconSample(x, y, { maskable, rounded, s }) {
+  if (rounded && !maskable && !inRoundRect(x, y, 0, 0, 512, 512, 112)) return null
+  const u = (x - (256 - 256 * s)) / s, v = (y - (256 - 256 * s + 10)) / s
+  const c = panda(u, v)
+  return c ? hex(c) : tileBg(x, y)
+}
+function rasterIcon(size, opts) {
   const N = 4, px = Buffer.alloc(size * size * 4)
-  const o = { maskable: false, rounded: true, s: 1, ...opts }
-  if (o.maskable && !opts.s) o.s = 0.78
+  const o = { maskable: false, rounded: true, s: 0.92, ...opts }
+  if (o.maskable && !opts.s) o.s = 0.8
   for (let py = 0; py < size; py++) for (let pxi = 0; pxi < size; pxi++) {
     let r = 0, g = 0, b = 0, a = 0
     for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
-      const c = sample(((pxi + (sx + 0.5) / N) / size) * 512, ((py + (sy + 0.5) / N) / size) * 512, o)
-      if (c) { const [cr, cg, cb] = hex(c); r += cr; g += cg; b += cb; a++ }
+      const c = iconSample(((pxi + (sx + 0.5) / N) / size) * 512, ((py + (sy + 0.5) / N) / size) * 512, o)
+      if (c) { r += c[0]; g += c[1]; b += c[2]; a++ }
     }
     const i = (py * size + pxi) * 4
     if (a) { px[i] = r / a; px[i + 1] = g / a; px[i + 2] = b / a }
     px[i + 3] = Math.round((a / (N * N)) * 255)
   }
-  return png(size, px)
+  return png(size, size, px)
+}
+
+/** iOS launch image: warm canvas colour with the jade panda tile centred (only the tile is supersampled). */
+function rasterSplash(w, h) {
+  const px = Buffer.alloc(w * h * 4)
+  const [cr, cg, cb] = hex(CANVAS)
+  for (let i = 0; i < w * h; i++) { px[i * 4] = cr; px[i * 4 + 1] = cg; px[i * 4 + 2] = cb; px[i * 4 + 3] = 255 }
+  const tile = Math.round(w * 0.34), x0 = Math.round((w - tile) / 2), y0 = Math.round(h * 0.42 - tile / 2), N = 3
+  const o = { maskable: false, rounded: true, s: 0.92 }
+  for (let py = 0; py < tile; py++) for (let pxi = 0; pxi < tile; pxi++) {
+    let r = 0, g = 0, b = 0, a = 0
+    for (let sy = 0; sy < N; sy++) for (let sx = 0; sx < N; sx++) {
+      const c = iconSample(((pxi + (sx + 0.5) / N) / tile) * 512, ((py + (sy + 0.5) / N) / tile) * 512, o)
+      if (c) { r += c[0]; g += c[1]; b += c[2]; a++ }
+    }
+    const t = a / (N * N), i = ((y0 + py) * w + x0 + pxi) * 4
+    if (a) { px[i] = cr + (r / a - cr) * t; px[i + 1] = cg + (g / a - cg) * t; px[i + 2] = cb + (b / a - cb) * t }
+  }
+  return png(w, h, px)
 }
 
 // ── Minimal PNG encoder ───────────────────────────────────────
 const CRC = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0 })
-const crc32 = buf => { let c = 0xffffffff; for (const b of buf) c = CRC[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0 }
+const crc32 = (buf) => { let c = 0xffffffff; for (const b of buf) c = CRC[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0 }
 function chunk(type, data) {
   const len = Buffer.alloc(4); len.writeUInt32BE(data.length)
   const td = Buffer.concat([Buffer.from(type, 'ascii'), data])
   const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td))
   return Buffer.concat([len, td, crc])
 }
-function png(size, rgba) {
+function png(w, h, rgba) {
   const ihdr = Buffer.alloc(13)
-  ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4)
+  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4)
   ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0
-  const raw = Buffer.alloc(size * (size * 4 + 1))
-  for (let y = 0; y < size; y++) { raw[y * (size * 4 + 1)] = 0; rgba.copy(raw, y * (size * 4 + 1) + 1, y * size * 4, (y + 1) * size * 4) }
+  const raw = Buffer.alloc(h * (w * 4 + 1))
+  for (let y = 0; y < h; y++) { raw[y * (w * 4 + 1)] = 0; rgba.copy(raw, y * (w * 4 + 1) + 1, y * w * 4, (y + 1) * w * 4) }
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 9 })), chunk('IEND', Buffer.alloc(0))])
 }
 
 writeFileSync(join(OUT, 'favicon.svg'), svg())
 writeFileSync(join(OUT, 'icon.svg'), svg())
 writeFileSync(join(OUT, 'icon-maskable.svg'), svg({ maskable: true }))
-writeFileSync(join(OUT, 'icon-192.png'), raster(192, {}))
-writeFileSync(join(OUT, 'icon-512.png'), raster(512, {}))
-writeFileSync(join(OUT, 'icon-maskable-512.png'), raster(512, { maskable: true }))
-writeFileSync(join(OUT, 'apple-touch-icon.png'), raster(180, { rounded: false, s: 0.9 }))
-console.log('icons written to', OUT)
+writeFileSync(join(OUT, 'icon-192.png'), rasterIcon(192, {}))
+writeFileSync(join(OUT, 'icon-512.png'), rasterIcon(512, {}))
+writeFileSync(join(OUT, 'icon-maskable-512.png'), rasterIcon(512, { maskable: true }))
+writeFileSync(join(OUT, 'apple-touch-icon.png'), rasterIcon(180, { rounded: false }))
+
+// iOS launch screens (portrait), referenced from index.html.
+const SPLASH = [[1125, 2436], [1170, 2532], [1179, 2556], [1206, 2622], [1242, 2688], [1284, 2778], [1290, 2796], [1320, 2868], [750, 1334]]
+mkdirSync(join(OUT, 'splash'), { recursive: true })
+for (const [w, h] of SPLASH) writeFileSync(join(OUT, 'splash', `splash-${w}x${h}.png`), rasterSplash(w, h))
+console.log('icons + splash written to', OUT)

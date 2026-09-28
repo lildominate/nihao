@@ -1,13 +1,19 @@
 // OWNER: Motivation agent. Levels, achievements, daily quests, streak freeze. Signatures = contract.
-import type { ReactNode } from 'react'
-
-/** Wrap inside <ProgressProvider>; listens to onSessionFinished and owns its own storage. */
-export function MotivationProvider({ children }: { children: ReactNode }) { return children }
-/** Compact card for the home screen: today's 3 quests with progress. */
-export function DailyQuestsCard() { return null }
-/** Small level chip (e.g. "Nivå 4") with progress to next level, for the top bar. */
-export function LevelBadge() { return null }
-/** Full achievements/stats section for the Profile tab. */
-export function AchievementsSection() { return null }
-/** Global overlay host: shows level-up / achievement / streak-milestone celebrations when they happen. */
-export function MotivationOverlays() { return null }
+//
+// Wiring (shell):
+//   <ProgressProvider><MotivationProvider><App/><MotivationOverlays paused={inSession}/></MotivationProvider></ProgressProvider>
+// Display the streak with useEffectiveStreak().current (includes "Streakskydd"), not displayStreak().
+// Level XP = progress.xpTotal + bonusXp (quest chests). bonusXp lives in "nihao/motivation/v1".
+export { MotivationProvider, useMotivation, useEffectiveStreak } from './context'
+export type { MotivationApi } from './context'
+export { DailyQuestsCard, LevelBadge, AchievementsSection, WeeklyRecapCard, StreakFreezeInfo } from './components'
+export { MotivationOverlays } from './overlays'
+export { Medal, Chest, FreezeIcon } from './art'
+export { levelForXp, xpForLevel, titleForLevel, LEVEL_TITLES, MAX_LEVEL } from './levels'
+export type { LevelInfo } from './levels'
+export { ACHIEVEMENTS } from './achievements'
+export type { AchievementView } from './achievements'
+export type { QuestView } from './quests'
+export type { EffectiveStreak } from './streak'
+export type { Celebration, WeeklyRecap } from './state'
+export { MOTIVATION_KEY } from './storage'

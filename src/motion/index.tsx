@@ -1,21 +1,26 @@
 // OWNER: Motion agent. Animation & feedback primitives used across the app. Signatures = contract.
-import type { ReactNode } from 'react'
+// Usage guide: src/motion/README.md. CSS utilities: src/styles/motion.css. Demo: /src/motion/_demo/index.html
+//
+//   celebrate(kind, opts?)            canvas particles: 'confetti' | 'burst' | 'fireworks' | 'stars'
+//   haptic(kind?)                     vibration / iOS 18 switch tick; silent no-op elsewhere
+//   <CountUp value />                 rolling number
+//   <Transition swapKey kind />       enter animation when swapKey changes
+//   <Splash onDone />                 launch/loading screen
+//   <CelebrationOverlay open … />     full-screen reward moment
+//   useReducedMotion()                OS setting OR settings.reduceMotion (safe without provider)
+//   <MotionSettingsSync />            mount once inside ProgressProvider (applies the app setting to CSS)
+//   <Skeleton />, <Pressable />, setTapSound(), flyTo(), bump(), replay(), prefersReducedMotion()
 
-/** Fire a celebration overlay (canvas/DOM, auto-cleans). Respects reduced motion. */
-export function celebrate(_kind: 'confetti' | 'burst' | 'fireworks' | 'stars' = 'confetti', _opts?: { origin?: { x: number; y: number } }): void {}
-/** Short vibration where supported (Android); no-op on iOS. */
-export function haptic(_kind: 'light' | 'success' | 'error' = 'light'): void {}
-/** Number that rolls up/down to `value`. */
-export function CountUp({ value, className }: { value: number; durationMs?: number; className?: string }) {
-  return <span className={className}>{value}</span>
+export { celebrate } from './particles'
+export type { CelebrateKind, CelebrateOptions } from './particles'
+export { haptic, setHapticsEnabled } from './haptics'
+export type { HapticKind } from './haptics'
+export { CountUp, Transition, Splash, CelebrationOverlay, Skeleton, Pressable, setTapSound } from './components'
+export { useReducedMotion, prefersReducedMotion, MotionSettingsSync, setAppReducedMotion } from './reduced'
+export { flyTo, bump, replay } from './fly'
+export type { FlyOptions } from './fly'
+
+// iOS Safari only applies :active (used by `.press`) when a touchstart listener exists.
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', () => {}, { passive: true })
 }
-/** Animated enter when `swapKey` changes (screen/exercise transitions). */
-export function Transition({ swapKey, children, className }: { swapKey: string | number; kind?: 'slide' | 'fade' | 'pop' | 'up'; children: ReactNode; className?: string }) {
-  return <div key={swapKey} className={className}>{children}</div>
-}
-/** Full-screen splash/loading screen with the mascot. */
-export function Splash(_props: { message?: string; onDone?: () => void }) { return null }
-/** Big full-screen celebration moment (level up, streak, lesson done). */
-export function CelebrationOverlay(_props: { open: boolean; title: string; subtitle?: string; mood?: 'cheer' | 'proud'; onClose: () => void; children?: ReactNode }) { return null }
-/** true if the user prefers reduced motion (OS setting or app setting). */
-export function useReducedMotion(): boolean { return false }

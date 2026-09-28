@@ -3,14 +3,14 @@ import { MicButton } from '../../speech/MicButton'
 import { recognitionSupport } from '../../speech'
 import { PinyinText } from '../../speech/PinyinText'
 import { SpeakButton } from '../../speech/SpeakButton'
-import { itemInfo } from '../items'
+import { infoFor } from './lineInfo'
 import { Instruction, ItemPinyin, type ExProps } from './common'
 
 const MAX_TRIES = 3
 
 /** Say it → speech recognition. Skippable via the footer ("Kan inte prata nu"). */
 export function Speak({ ex, course, settings, verdict, submit }: ExProps<'speak'>) {
-  const info = itemInfo(course, ex.item)
+  const info = infoFor(course, ex.item)
   const [support] = useState(recognitionSupport)
   const [tries, setTries] = useState(0)
   const [heard, setHeard] = useState<string | null>(null)

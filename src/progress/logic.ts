@@ -1,7 +1,8 @@
 // Pure progress logic: SRS, XP, streak, unlocking, queries. No I/O.
-import type { Course, ItemRef, LessonResult, Settings, SrsCard } from '../types'
+import type { Course, ItemRef, LessonResult, Settings } from '../types'
 import type { LessonStatus, ProgressState } from './index'
 import { addDays, daysBetween } from './dates'
+import { newCard, reviewCard, memoryOf, type ProgressCard } from './fsrs'
 
 // ─── Defaults ────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export function initialState(): ProgressState {
   return {
-    version: 1,
+    version: 2,
     completedLessons: {},
     xpTotal: 0,
     xpByDay: {},
@@ -32,53 +33,16 @@ export function clampSettings(s: Settings): Settings {
   return { ...s, speechRate: Math.min(1.2, Math.max(0.5, rate)), dailyGoalXp: Math.max(1, goal) }
 }
 
-// ─── SRS (SM-2 style, binary quality) ────────────────────────
+// ─── SRS (FSRS-5, see ./fsrs.ts) ─────────────────────────────
 
+export { newCard, reviewCard, masteryOfCard, cardRetrievability, memoryOf } from './fsrs'
+export type { ProgressCard } from './fsrs'
+/** v1 SM-2 constants, kept for compatibility (ease is now derived from FSRS difficulty). */
 export const INITIAL_EASE = 2.5
 export const MIN_EASE = 1.3
 export const MAX_EASE = 3.0
-export const EASE_PENALTY = 0.2
-export const EASE_BONUS = 0.05
 
 export const cardKey = (item: ItemRef) => `${item.kind}:${item.id}`
-
-export function newCard(item: ItemRef, today: string): SrsCard {
-  return { item: { kind: item.kind, id: item.id }, ease: INITIAL_EASE, intervalDays: 0, due: today, reps: 0, lapses: 0 }
-}
-
-/**
- * Applies one graded review.
- * - correct: interval 1d → 3d → round(interval × ease); ease +0.05 (cap 3.0).
- *   If the card is not yet due (e.g. lesson replay), a correct answer does not
- *   advance the schedule — early reviews would inflate intervals.
- * - wrong: lapse; reps 0, interval 1d (due tomorrow), ease −0.2 (floor 1.3).
- */
-export function reviewCard(card: SrsCard, correct: boolean, today: string): SrsCard {
-  if (!correct) {
-    return {
-      ...card,
-      reps: 0,
-      lapses: card.lapses + 1,
-      ease: Math.max(MIN_EASE, round2(card.ease - EASE_PENALTY)),
-      intervalDays: 1,
-      due: addDays(today, 1),
-    }
-  }
-  const isNew = card.reps === 0 && card.intervalDays === 0
-  if (!isNew && card.due > today) return card
-  const reps = card.reps + 1
-  const intervalDays =
-    reps === 1 ? 1 : reps === 2 ? 3 : Math.max(card.intervalDays + 1, Math.round(card.intervalDays * card.ease))
-  return {
-    ...card,
-    reps,
-    intervalDays,
-    ease: Math.min(MAX_EASE, round2(card.ease + EASE_BONUS)),
-    due: addDays(today, intervalDays),
-  }
-}
-
-const round2 = (n: number) => Math.round(n * 100) / 100
 
 /** First attempt per item decides quality. Returns items in first-seen order. */
 export function firstAttempts(result: LessonResult): { item: ItemRef; correct: boolean }[] {
@@ -187,11 +151,11 @@ export function lessonStatus(state: ProgressState, course: Course, lessonId: str
   return 'locked'
 }
 
-/** Cards due on/before today, most overdue first, then lowest ease. */
+/** Cards due on/before today, most overdue first, then lowest ease (= highest FSRS difficulty), then lowest stability. */
 export function dueItems(state: ProgressState, today: string, limit?: number): ItemRef[] {
   const due = Object.values(state.cards)
     .filter((c) => c.due <= today)
-    .sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.ease - b.ease))
+    .sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.ease - b.ease || memoryOf(a).stability - memoryOf(b).stability))
   return take(due, limit).map((c) => c.item)
 }
 
@@ -219,6 +183,40 @@ export function xpHistory(state: ProgressState, today: string, days = 7): { day:
     const day = addDays(today, i - (days - 1))
     return { day, xp: state.xpByDay[day] ?? 0 }
   })
+}
+
+// ─── Placement ───────────────────────────────────────────────
+
+/**
+ * Placement skip: marks every lesson before `lessonId` completed (existing
+ * completions are kept) and seeds their new words as known-but-fragile cards
+ * (S = 2 d, D = 5, 1 rep). Due dates are staggered over the next 1–4 days so
+ * the verification reviews don't arrive as one flood. Existing cards are not
+ * touched. No XP, no streak change. Unknown lessonId → state unchanged.
+ */
+export function skipToLesson(state: ProgressState, course: Course, lessonId: string, now: Date, today: string): ProgressState {
+  const order = course.units.flatMap((u) => u.lessons)
+  const idx = order.findIndex((l) => l.id === lessonId)
+  if (idx <= 0) return state
+  const completedLessons = { ...state.completedLessons }
+  const cards = { ...state.cards }
+  let n = 0
+  for (const l of order.slice(0, idx)) {
+    completedLessons[l.id] ??= { bestAccuracy: 0.8, completions: 1, lastAt: now.toISOString() }
+    for (const id of l.newWords) {
+      const item: ItemRef = { kind: 'word', id }
+      const k = cardKey(item)
+      if (cards[k] || !course.words[id]) continue
+      const interval = 1 + (n++ % 4)
+      const card: ProgressCard = {
+        ...newCard(item, today),
+        reps: 1, stability: 2, difficulty: 5, ease: 2.5, lastReview: today,
+        intervalDays: interval, due: addDays(today, interval),
+      }
+      cards[k] = card
+    }
+  }
+  return { ...state, completedLessons, cards }
 }
 
 function take<T>(arr: T[], limit?: number): T[] {

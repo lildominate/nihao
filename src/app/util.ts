@@ -1,16 +1,19 @@
 // Shell helpers.
-import type { Course, Unit } from '../types'
+import type { Course, Dialogue, Unit } from '../types'
 
-/** Per-unit colour theme (cycled). */
+/** Per-unit colour theme (cycled). `soft` adapts to light/dark via color-mix with the surface. */
+const mk = (bg: string, dark: string, light: string) => ({ bg, dark, light, soft: `color-mix(in oklab, ${bg} 15%, var(--color-surface))` })
 export const UNIT_COLORS = [
-  { bg: '#22c55e', dark: '#16a34a', soft: '#dcfce7' }, // green
-  { bg: '#0ea5e9', dark: '#0284c7', soft: '#e0f2fe' }, // sky
-  { bg: '#a855f7', dark: '#9333ea', soft: '#f3e8ff' }, // purple
-  { bg: '#f97316', dark: '#ea580c', soft: '#ffedd5' }, // orange
-  { bg: '#ec4899', dark: '#db2777', soft: '#fce7f3' }, // pink
-  { bg: '#14b8a6', dark: '#0d9488', soft: '#ccfbf1' }, // teal
-  { bg: '#eab308', dark: '#ca8a04', soft: '#fef9c3' }, // yellow
-  { bg: '#6366f1', dark: '#4f46e5', soft: '#e0e7ff' }, // indigo
+  mk('#12a179', '#0a7a5a', '#3fcf9f'), // jade
+  mk('#e0533f', '#a93523', '#f47e68'), // lacquer red
+  mk('#2f8fe0', '#1a67ad', '#62b2f5'), // porcelain blue
+  mk('#8b5cf6', '#6a3fd0', '#ab88ff'), // plum
+  mk('#f08a24', '#bb5f08', '#ffac55'), // persimmon
+  mk('#11a3a8', '#0a787c', '#3fcacd'), // teal
+  mk('#d9a007', '#9f7200', '#f5c233'), // imperial gold
+  mk('#4f63d8', '#3345a8', '#7b8cf0'), // indigo
+  mk('#e2517f', '#b02e5a', '#f57ea2'), // peony
+  mk('#5fa32a', '#427a17', '#86c451'), // bamboo
 ] as const
 export const unitColor = (i: number) => UNIT_COLORS[i % UNIT_COLORS.length]
 
@@ -36,3 +39,17 @@ export const ONBOARDED_KEY = 'nihao/onboarded'
 export function safeGet(key: string): string | null { try { return localStorage.getItem(key) } catch { return null } }
 export function safeSet(key: string, v: string): void { try { localStorage.setItem(key, v) } catch { /* ignore */ } }
 export function safeRemove(key: string): void { try { localStorage.removeItem(key) } catch { /* ignore */ } }
+
+// Dialogues/stories the learner has played through (for the "done" state on the path).
+const DIALOGUES_SEEN_KEY = 'nihao/dialogues-seen'
+export function seenDialogues(): Set<string> {
+  try { return new Set(JSON.parse(safeGet(DIALOGUES_SEEN_KEY) ?? '[]') as string[]) } catch { return new Set() }
+}
+export function markDialogueSeen(id: string): void {
+  const s = seenDialogues(); s.add(id); safeSet(DIALOGUES_SEEN_KEY, JSON.stringify([...s]))
+}
+
+/** Dialogues/stories that sit on the path right after `lessonId`. */
+export function dialoguesAfter(course: Course, lessonId: string): Dialogue[] {
+  return Object.values(course.dialogues ?? {}).filter((d) => d.afterLessonId === lessonId)
+}

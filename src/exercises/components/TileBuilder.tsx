@@ -1,4 +1,6 @@
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import { haptic } from '../../motion'
+import { PRESS } from './util'
 
 /** Duolingo word bank: tap tiles to move them to the answer line and back. */
 export function TileBuilder({ tiles, picked, onChange, locked, render, onTapTile }: {
@@ -10,19 +12,23 @@ export function TileBuilder({ tiles, picked, onChange, locked, render, onTapTile
   render: (t: string) => ReactNode
   onTapTile?: (t: string) => void
 }) {
-  const tile = 'inline-flex min-h-12 items-center rounded-xl border-2 border-b-4 border-line bg-surface px-3 py-1.5 text-lg font-bold text-ink transition-transform active:translate-y-0.5 active:border-b-2 disabled:active:translate-y-0 disabled:active:border-b-4'
+  // Latest picks, updated synchronously so two taps within one frame both count.
+  const latest = useRef(picked)
+  useLayoutEffect(() => { latest.current = picked }, [picked])
+  const set = (next: number[]) => { latest.current = next; onChange(next) }
+  const tile = `inline-flex min-h-12 min-w-11 items-center justify-center rounded-xl border-2 border-b-4 border-line bg-surface px-3 py-1.5 text-lg font-bold text-ink ${PRESS}`
   return (
     <div className="flex flex-col gap-6">
       <div
         className="flex min-h-[7.5rem] flex-wrap content-start gap-2 bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_58px,var(--color-line)_58px,var(--color-line)_60px)] py-1"
         aria-label="Ditt svar"
       >
-        {picked.map((ti, pos) => (
+        {picked.map((ti) => (
           <button
             key={`${ti}`}
             type="button"
             disabled={locked}
-            onClick={() => onChange(picked.filter((_, p) => p !== pos))}
+            onClick={() => set(latest.current.filter((x) => x !== ti))}
             className={`${tile} animate-pop`}
           >
             {render(tiles[ti])}
@@ -39,7 +45,7 @@ export function TileBuilder({ tiles, picked, onChange, locked, render, onTapTile
               key={i}
               type="button"
               disabled={locked}
-              onClick={() => { onTapTile?.(t); onChange([...picked, i]) }}
+              onClick={() => { if (latest.current.includes(i)) return; haptic('select'); onTapTile?.(t); set([...latest.current, i]) }}
               className={tile}
             >
               {render(t)}

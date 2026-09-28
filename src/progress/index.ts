@@ -1,7 +1,9 @@
 // OWNER: Progress agent. Public API — signatures are the contract.
 import { createContext, createElement, useContext, useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
-import type { ItemRef, LessonResult, Settings, SrsCard } from '../types'
+import type { ItemRef, LessonResult, Settings } from '../types'
+import type { ProgressCard } from './fsrs'
+import { cardRetrievability, masteryOfCard } from './fsrs'
 import { course } from '../data/course'
 import * as logic from './logic'
 import { localDay } from './dates'
@@ -10,12 +12,13 @@ import { getProgressStore, STORAGE_KEY } from './storage'
 import type { ProgressStore } from './storage'
 
 export interface ProgressState {
-  version: 1
+  /** 2 = FSRS cards (v1 SM-2 saves are migrated on load, see storage.migrate). */
+  version: 2
   completedLessons: Record<string, { bestAccuracy: number; completions: number; lastAt: string }>
   xpTotal: number
   xpByDay: Record<string, number>        // "YYYY-MM-DD" → xp
   streak: { current: number; best: number; lastDay: string | null }
-  cards: Record<string, SrsCard>          // key = `${kind}:${id}`
+  cards: Record<string, ProgressCard>     // key = `${kind}:${id}`; ProgressCard = SrsCard + optional FSRS fields
   settings: Settings
 }
 
@@ -36,10 +39,16 @@ export interface ProgressApi {
   resetAll(): void
   /** v2: how well an item is known, 0 (unseen) … 5 (mastered). Pedagogy agent owns the model. */
   mastery(item: ItemRef): number
+  /** v2: estimated probability (0–1) of recalling the item today; 0 if unseen. */
+  retrievability(item: ItemRef): number
+  /** v2 (placement): completes all lessons before `lessonId` and seeds their words as fragile known cards. */
+  skipToLesson(lessonId: string): void
 }
 
 // Extra exports (pure helpers usable outside React).
 export { DEFAULT_SETTINGS, displayStreak, xpHistory, sessionXp, cardKey } from './logic'
+export { masteryOfCard, retrievability as fsrsRetrievability, nextInterval, TARGET_RETENTION } from './fsrs'
+export type { ProgressCard } from './fsrs'
 export { localDay, addDays } from './dates'
 export { STORAGE_KEY } from './storage'
 export { onSessionFinished } from './events'
@@ -48,6 +57,11 @@ export type { SessionEvent } from './events'
 /** Serialized progress backup (JSON string). */
 export function exportProgress(): string {
   return getProgressStore().exportJson()
+}
+
+/** v2 placement helper (outside React): completes lessons before `lessonId`, seeds their words. */
+export function skipToLesson(lessonId: string): void {
+  getProgressStore().skipToLesson(lessonId)
 }
 
 /** Restores a backup; returns false (and changes nothing) if the JSON is invalid. Updates the live UI. */
@@ -71,12 +85,12 @@ export function buildApi(store: ProgressStore, state: ProgressState, c = course)
     todayXp: () => logic.todayXp(state, today()),
     updateSettings: (patch) => store.updateSettings(patch),
     resetAll: () => store.resetAll(),
-    // Placeholder model until the pedagogy agent replaces it.
-    mastery: (item) => {
+    mastery: (item) => masteryOfCard(state.cards[logic.cardKey(item)]),
+    retrievability: (item) => {
       const card = state.cards[logic.cardKey(item)]
-      if (!card) return 0
-      return Math.max(1, Math.min(5, card.reps + 1 - Math.min(card.lapses, 2)))
+      return card ? cardRetrievability(card, today()) : 0
     },
+    skipToLesson: (lessonId) => store.skipToLesson(lessonId, c),
   }
 }
 

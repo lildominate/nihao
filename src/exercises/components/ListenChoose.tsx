@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { SpeakButton } from '../../speech/SpeakButton'
-import { itemInfo } from '../items'
+import { infoFor } from './lineInfo'
+import { explainSvChoice } from './explain'
 import { ChoiceList, Instruction, ItemPinyin, type ExProps } from './common'
 
 /** Hear audio → pick the Swedish meaning. */
 export function ListenChoose({ ex, course, settings, verdict, setChecker }: ExProps<'listen-choose'>) {
-  const info = itemInfo(course, ex.item)
+  const info = infoFor(course, ex.item)
   const [sel, setSel] = useState<string | null>(null)
   useEffect(() => {
-    setChecker(sel == null ? null : () => (sel === ex.answer ? { status: 'correct' } : { status: 'wrong', answer: { text: ex.answer } }))
-  }, [sel, ex, setChecker])
+    setChecker(sel == null ? null : () => (sel === ex.answer ? { status: 'correct' } : { status: 'wrong', answer: { text: ex.answer, pinyin: info.pinyin }, explain: explainSvChoice(course, sel) }))
+  }, [sel, ex, setChecker, course, info.pinyin])
 
   return (
     <div className="flex flex-col gap-6">

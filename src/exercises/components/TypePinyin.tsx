@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react'
 import { checkTypedPinyin, numbersToMarks } from '../../speech/pinyin'
 import { PinyinText } from '../../speech/PinyinText'
 import { SpeakButton } from '../../speech/SpeakButton'
-import { itemInfo } from '../items'
+import { infoFor } from './lineInfo'
+import { explainTones } from './explain'
 import { Instruction, PromptCard, type ExProps } from './common'
 
 /** See Swedish (and optionally hear it) → type the pinyin. Tone numbers ("shui3") are fine. */
 export function TypePinyin({ ex, course, settings, verdict, setChecker }: ExProps<'type-pinyin'>) {
-  const info = itemInfo(course, ex.item)
+  const info = infoFor(course, ex.item)
   const [value, setValue] = useState('')
   useEffect(() => {
     setChecker(!value.trim() ? null : () => {
       const r = checkTypedPinyin(value, info.pinyin)
       if (r === 'exact') return { status: 'correct' }
-      if (r === 'tones-wrong') return { status: 'almost', answer: { pinyin: info.pinyin } }
+      if (r === 'tones-wrong') return { status: 'almost', answer: { pinyin: info.pinyin }, explain: explainTones(numbersToMarks(value), info.pinyin, true) }
       return { status: 'wrong', answer: { pinyin: info.pinyin } }
     })
   }, [value, info.pinyin, setChecker])

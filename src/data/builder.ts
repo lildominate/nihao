@@ -1,7 +1,7 @@
-// OWNER: Curriculum agent.
+// OWNER: Content agent.
 // Compact authoring format for the course. Units are written as UnitSpec
 // objects (see units/*.ts) and turned into the shared `Course` shape here.
-import type { Course, Lesson, Sentence, Unit, Word } from '../types'
+import type { Course, Dialogue, DialogueLine, Lesson, Sentence, Unit, Word } from '../types'
 
 type Pos = NonNullable<Word['pos']>
 
@@ -18,12 +18,35 @@ export type WordSpec = [id: string, hanzi: string, pinyin: string, sv: string, p
  * "?" "," "!" ".". Hanzi, pinyin chunks and wordIds are derived from the
  * words, so a sentence can never drift from its vocabulary:
  *  - hanzi   = word hanzi concatenated (punctuation → ？ ， ！ 。)
- *  - chunks  = one chunk per word (its pinyin); "?" is kept as its own
- *              final chunk, other punctuation is not a tile.
+ *  - chunks  = one chunk per word (its pinyin). A final "?" is its own
+ *              chunk; a final "." / "!" is dropped. Punctuation INSIDE the
+ *              sentence is attached to the preceding chunk ("lǎo shī ,"),
+ *              so "lǎo shī , zài jiàn" (hej då, lärare) can never be read as
+ *              one run-on phrase.
  * `sv` may hold alternatives separated by "/" (first = primary). Swedish
  * contains no punctuation. svChunks defaults to the primary split on spaces.
+ *
+ * IDS ARE POSITION-BASED (learners have SRS progress on them):
+ * only APPEND sentences / dialogues / words at the end of their lists.
  */
 export type SentenceSpec = [tokens: string, sv: string, svChunks?: string[]]
+
+/**
+ * [speaker, tokens, sv] — tokens as in SentenceSpec. `sv` is display text
+ * and MAY contain punctuation ("Hej! Hur mår du?"). Speaker N = narrator.
+ */
+export type LineSpec = [speaker: DialogueLine['speaker'], tokens: string, sv: string]
+
+export interface DialogueSpec {
+  kind?: Dialogue['kind']            // default 'dialogue'
+  title: string
+  context: string
+  /** Swedish role names. Stories may omit it (defaults to "Berättaren"). */
+  speakers?: Dialogue['speakers']
+  /** 1-based index of the lesson in THIS unit after which it unlocks. */
+  afterLesson: number
+  lines: LineSpec[]
+}
 
 export interface LessonSpec {
   title: string
@@ -38,6 +61,8 @@ export interface UnitSpec {
   description: string
   emoji: string
   lessons: LessonSpec[]
+  /** Append-only: ids are `${unitId}-d${index + 1}`. */
+  dialogues?: DialogueSpec[]
 }
 
 const PUNCT_HANZI: Record<string, string> = { '?': '？', ',': '，', '!': '！', '.': '。' }
@@ -47,9 +72,39 @@ function splitAlt(s: string): [string, string[] | undefined] {
   return [parts[0], parts.length > 1 ? parts.slice(1) : undefined]
 }
 
+/** Token string → hanzi, pinyin chunks and word ids (see SentenceSpec). */
+export function compileTokens(
+  tokensRaw: string,
+  words: Record<string, Word>,
+): { hanzi: string; chunks: string[]; wordIds: string[] } {
+  const tokens = tokensRaw.trim().split(/\s+/)
+  let hanzi = ''
+  const chunks: string[] = []
+  const wordIds: string[] = []
+  tokens.forEach((t, i) => {
+    if (t in PUNCT_HANZI) {
+      hanzi += PUNCT_HANZI[t]
+      const last = i === tokens.length - 1
+      if (last) {
+        if (t === '?') chunks.push('?')
+      } else if (chunks.length) {
+        chunks[chunks.length - 1] += ` ${t}`
+      }
+      return
+    }
+    const w = words[t]
+    // Unknown ids are kept in wordIds so the tests flag them.
+    hanzi += w ? w.hanzi : ''
+    chunks.push(w ? w.pinyin : `<${t}>`)
+    if (!wordIds.includes(t)) wordIds.push(t)
+  })
+  return { hanzi, chunks, wordIds }
+}
+
 export function buildCourse(specs: UnitSpec[]): Course {
   const words: Record<string, Word> = {}
   const sentences: Record<string, Sentence> = {}
+  const dialogues: Record<string, Dialogue> = {}
   const units: Unit[] = []
 
   // First pass: collect all words (so sentence building can look them up).
@@ -72,22 +127,7 @@ export function buildCourse(specs: UnitSpec[]): Course {
       const lessonId = `${unitId}-l${li + 1}`
       const sentenceIds = l.sentences.map(([tokensRaw, svRaw, svChunksOverride], si) => {
         const id = `${lessonId}-s${si + 1}`
-        const tokens = tokensRaw.trim().split(/\s+/)
-        let hanzi = ''
-        const chunks: string[] = []
-        const wordIds: string[] = []
-        for (const t of tokens) {
-          if (t in PUNCT_HANZI) {
-            hanzi += PUNCT_HANZI[t]
-            if (t === '?') chunks.push('?')
-            continue
-          }
-          const w = words[t]
-          // Unknown ids are kept in wordIds so the tests flag them.
-          hanzi += w ? w.hanzi : ''
-          chunks.push(w ? w.pinyin : `<${t}>`)
-          if (!wordIds.includes(t)) wordIds.push(t)
-        }
+        const { hanzi, chunks, wordIds } = compileTokens(tokensRaw, words)
         const [sv, svAlt] = splitAlt(svRaw)
         const s: Sentence = { id, hanzi, chunks, sv, svChunks: svChunksOverride ?? sv.split(' '), wordIds }
         if (svAlt) s.svAlt = svAlt
@@ -104,8 +144,27 @@ export function buildCourse(specs: UnitSpec[]): Course {
       if (l.tip) lesson.tip = l.tip
       return lesson
     })
-    units.push({ id: unitId, title: u.title, description: u.description, emoji: u.emoji, lessons })
+
+    const dialogueIds = (u.dialogues ?? []).map((d, di) => {
+      const id = `${unitId}-d${di + 1}`
+      const kind = d.kind ?? 'dialogue'
+      dialogues[id] = {
+        id,
+        unitId,
+        kind,
+        title: d.title,
+        context: d.context,
+        speakers: d.speakers ?? { A: 'Berättaren', B: 'Berättaren' },
+        afterLessonId: `${unitId}-l${d.afterLesson}`,
+        lines: d.lines.map(([speaker, tokens, sv]) => ({ speaker, ...compileTokens(tokens, words), sv })),
+      }
+      return id
+    })
+
+    const unit: Unit = { id: unitId, title: u.title, description: u.description, emoji: u.emoji, lessons }
+    if (dialogueIds.length) unit.dialogueIds = dialogueIds
+    units.push(unit)
   })
 
-  return { units, words, sentences }
+  return { units, words, sentences, dialogues }
 }

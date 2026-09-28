@@ -106,3 +106,18 @@ export function playSfx(s: Sfx): void {
       break
   }
 }
+
+/** The shared AudioContext (created/resumed on demand — call inside a tap on iOS). Null without WebAudio. */
+export function getAudioContext(): AudioContext | null {
+  return getCtx()
+}
+
+/**
+ * iOS 17+ audio session type. 'playback' (our default) keeps effects audible with the silent switch on;
+ * switch to 'play-and-record' while the microphone is open, then back to 'playback'.
+ */
+export function setAudioSessionType(type: 'playback' | 'play-and-record'): void {
+  if (typeof navigator === 'undefined') return
+  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+  if (session) try { session.type = type } catch { /* unsupported */ }
+}

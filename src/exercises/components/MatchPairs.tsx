@@ -4,7 +4,8 @@ import { speak } from '../../speech'
 import { PinyinText } from '../../speech/PinyinText'
 import { itemInfo, itemKey } from '../items'
 import { Instruction, type ExProps } from './common'
-import { sfx } from './util'
+import { haptic } from '../../motion'
+import { PRESS, sfx } from './util'
 
 function shuffled<T>(a: T[]): T[] {
   const r = [...a]
@@ -34,6 +35,7 @@ export function MatchPairs({ ex, course, settings, verdict, submit }: ExProps<'m
     const k = itemKey(r)
     if (verdict || matched.has(k)) return
     if (flash) setFlash(null)
+    haptic('select')
     if (side === 'left') void speak(itemInfo(course, r).hanzi, { rate: settings.speechRate })
     else sfx(settings, 'tap')
     const next = { ...sel, [side]: sel[side] === k ? undefined : k }
@@ -63,12 +65,12 @@ export function MatchPairs({ ex, course, settings, verdict, submit }: ExProps<'m
 
   const tileClass = (side: Side, k: string) => {
     if (matched.has(k)) return justMatched === k ? 'border-brand bg-brand-soft text-brand-dark animate-pop opacity-60' : 'border-line bg-surface-2 text-ink-muted opacity-40'
-    if (flash && flash[side] === k) return 'border-danger bg-danger-soft text-danger animate-[nh-shake_0.4s_ease-in-out]'
+    if (flash && flash[side] === k) return 'border-danger bg-danger-soft text-danger shake'
     if (sel[side] === k) return 'border-sky bg-sky-soft text-sky-dark'
     return 'border-line bg-surface text-ink hover:bg-surface-2'
   }
 
-  const base = 'flex min-h-16 w-full items-center justify-center rounded-2xl border-2 border-b-4 px-2 py-2 text-center font-bold transition-colors active:translate-y-0.5 active:border-b-2 disabled:active:translate-y-0 disabled:active:border-b-4'
+  const base = `flex min-h-16 w-full items-center justify-center rounded-2xl border-2 border-b-4 px-2 py-2 text-center font-bold ${PRESS}`
 
   return (
     <div className="flex flex-col gap-6">

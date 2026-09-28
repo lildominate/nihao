@@ -13,12 +13,14 @@ import {
   lessonStatus,
   newCard,
   reviewCard,
+  masteryOfCard,
   sessionXp,
   todayXp,
   weakItems,
   xpHistory,
 } from './logic'
 import { createProgressStore, parseState, STORAGE_KEY } from './storage'
+import { nextInterval, retrievability } from './fsrs'
 import type { StorageLike } from './storage'
 import { buildApi, ProgressProvider, useProgress } from './index'
 import type { ProgressState } from './index'
@@ -69,34 +71,157 @@ describe('defaults', () => {
   })
 })
 
-describe('SRS', () => {
+describe('SRS (FSRS-5)', () => {
   const T = '2026-09-01'
-  it('grows interval 1d, 3d, then ×ease', () => {
+  it('first correct answer → ~1 day, then growing intervals', () => {
     let c = reviewCard(newCard(w('a'), T), true, T)
-    expect(c).toMatchObject({ intervalDays: 1, due: '2026-09-02', reps: 1 })
-    c = reviewCard(c, true, c.due)
-    expect(c).toMatchObject({ intervalDays: 3, due: '2026-09-05', reps: 2 })
-    const ease = c.ease
-    c = reviewCard(c, true, c.due)
-    expect(c.intervalDays).toBe(Math.round(3 * ease))
-    expect(c.reps).toBe(3)
+    expect(c).toMatchObject({ intervalDays: 1, due: '2026-09-02', reps: 1, lastReview: T })
+    const intervals = [c.intervalDays]
+    for (let i = 0; i < 4; i++) {
+      c = reviewCard(c, true, c.due)
+      intervals.push(c.intervalDays)
+    }
+    for (let i = 1; i < intervals.length; i++) expect(intervals[i]).toBeGreaterThan(intervals[i - 1])
+    expect(intervals[2]).toBeGreaterThanOrEqual(7)
+    expect(c.reps).toBe(5)
   })
-  it('lapses on wrong: reset interval, ease −0.2, floor 1.3', () => {
+  it('at 90 % target retention the interval equals stability', () => {
+    expect(nextInterval(10)).toBe(10)
+    expect(retrievability(10, 10)).toBeCloseTo(0.9, 5)
+  })
+  it('lapses on wrong: due tomorrow, stability drops, difficulty rises', () => {
     let c = reviewCard(newCard(w('a'), T), true, T)
+    c = reviewCard(c, true, c.due)
+    const before = c
     c = reviewCard(c, false, c.due)
-    expect(c).toMatchObject({ reps: 0, lapses: 1, intervalDays: 1, due: '2026-09-03' })
-    expect(c.ease).toBeCloseTo(2.35)
-    for (let i = 0; i < 20; i++) c = reviewCard(c, false, T)
-    expect(c.ease).toBe(1.3)
+    expect(c).toMatchObject({ reps: 0, lapses: 1, intervalDays: 1, due: addDays(before.due, 1) })
+    expect(c.stability!).toBeLessThan(before.stability!)
+    expect(c.difficulty!).toBeGreaterThan(before.difficulty!)
+    expect(c.ease).toBeLessThan(before.ease)
+    for (let i = 0; i < 20; i++) c = reviewCard(c, false, addDays(T, 10 + i))
+    expect(c.difficulty!).toBeLessThanOrEqual(10)
+    expect(c.ease).toBeGreaterThanOrEqual(1.3)
   })
-  it('does not advance a card reviewed correctly before it is due', () => {
+  it('does not advance a card reviewed correctly again the same day', () => {
     const c = reviewCard(newCard(w('a'), T), true, T)
     expect(reviewCard(c, true, T)).toBe(c)
+  })
+  it('an early (not yet due) success grows stability less than an on-time one', () => {
+    let c = reviewCard(newCard(w('a'), T), true, T)
+    c = reviewCard(c, true, c.due)
+    c = reviewCard(c, true, c.due)
+    const early = reviewCard(c, true, addDays(c.lastReview!, 1))
+    const onTime = reviewCard(c, true, c.due)
+    expect(early.stability!).toBeLessThan(onTime.stability!)
   })
   it('first attempt decides quality within a session', () => {
     const r = applySession(initialState(), result([[w('a'), false], [w('a'), true], [w('b'), true], [w('b'), false]]), at(T), T)
     expect(r.state.cards['word:a'].lapses).toBe(1)
     expect(r.state.cards['word:b']).toMatchObject({ reps: 1, lapses: 0 })
+  })
+  it('mastery 0–5 grows with stability and reps', () => {
+    expect(masteryOfCard(undefined)).toBe(0)
+    let c = reviewCard(newCard(w('a'), T), false, T)
+    expect(masteryOfCard(c)).toBe(1)
+    c = reviewCard(newCard(w('a'), T), true, T)
+    const seen = [masteryOfCard(c)]
+    for (let i = 0; i < 5; i++) { c = reviewCard(c, true, c.due); seen.push(masteryOfCard(c)) }
+    expect(seen[0]).toBe(2)
+    for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1])
+    expect(seen[seen.length - 1]).toBe(5)
+  })
+  it('api exposes mastery and retrievability', () => {
+    const store = createProgressStore(new MemStorage(), () => at(T))
+    store.finishSession(result([[w('a'), true]]))
+    const api = buildApi(store, store.getState(), fixtureCourse)
+    expect(api.mastery(w('a'))).toBe(2)
+    expect(api.mastery(w('zz'))).toBe(0)
+    expect(api.retrievability(w('a'))).toBe(1)
+  })
+  it('records dialogue-line items', () => {
+    const line: ItemRef = { kind: 'line', id: 'u1-d1:1' }
+    const st = applySession(initialState(), result([[line, true]], null), at(T), T).state
+    expect(parseState(JSON.stringify(st))!.cards['line:u1-d1:1']).toMatchObject({ reps: 1 })
+  })
+})
+
+describe('v1 → v2 migration', () => {
+  const v1 = {
+    version: 1,
+    xpTotal: 120,
+    completedLessons: { 'u1-l1': { bestAccuracy: 0.9, completions: 2, lastAt: '2026-08-01T10:00:00.000Z' } },
+    cards: {
+      'word:a': { item: w('a'), ease: 2.6, intervalDays: 8, due: '2026-09-10', reps: 3, lapses: 0 },
+      'word:b': { item: w('b'), ease: 1.5, intervalDays: 1, due: '2026-09-02', reps: 0, lapses: 3 },
+      'sentence:s': { item: s('s'), ease: 2.5, intervalDays: 3, due: '2026-09-04', reps: 2, lapses: 0 },
+    },
+    settings: { speechRate: 0.9, multiVoice: false, theme: 'dark' },
+  }
+  it('keeps every card, due date and counts, and adds FSRS state', () => {
+    const st = parseState(JSON.stringify(v1))!
+    expect(st.version).toBe(2)
+    expect(Object.keys(st.cards).sort()).toEqual(['sentence:s', 'word:a', 'word:b'])
+    const a = st.cards['word:a']
+    expect(a).toMatchObject({ due: '2026-09-10', reps: 3, lapses: 0, intervalDays: 8, stability: 8, lastReview: '2026-09-02' })
+    expect(a.difficulty!).toBeGreaterThan(3)
+    expect(a.difficulty!).toBeLessThan(5)
+    const b = st.cards['word:b']
+    expect(b.difficulty!).toBeGreaterThan(8)
+    expect(b.stability!).toBeGreaterThan(0)
+    expect(st.xpTotal).toBe(120)
+    expect(st.completedLessons['u1-l1'].completions).toBe(2)
+    expect(st.settings).toMatchObject({ speechRate: 0.9, multiVoice: false, theme: 'dark' })
+  })
+  it('migrated cards keep scheduling sensibly', () => {
+    const st = parseState(JSON.stringify(v1))!
+    const a2 = reviewCard(st.cards['word:a'], true, '2026-09-10')
+    expect(a2.intervalDays).toBeGreaterThan(8)
+    expect(masteryOfCard(st.cards['word:a'])).toBe(3)
+    expect(masteryOfCard(st.cards['word:b'])).toBe(1)
+  })
+  it('v2 docs roundtrip unchanged', () => {
+    const st = parseState(JSON.stringify(v1))!
+    expect(parseState(JSON.stringify(st))).toEqual(st)
+  })
+})
+
+describe('skipToLesson (placement)', () => {
+  const course: Course = {
+    ...fixtureCourse,
+    words: { a: { id: 'a', hanzi: 'a', pinyin: 'ā', sv: 'a' }, b: { id: 'b', hanzi: 'b', pinyin: 'bā', sv: 'b' }, c: { id: 'c', hanzi: 'c', pinyin: 'cā', sv: 'c' } },
+    units: [
+      { ...fixtureCourse.units[0], lessons: [
+        { id: 'u1-l1', title: '1', kind: 'standard', newWords: ['a', 'b'], sentences: [] },
+        { id: 'u1-l2', title: '2', kind: 'standard', newWords: ['c'], sentences: [] },
+      ] },
+      fixtureCourse.units[1],
+    ],
+  }
+  it('completes earlier lessons and seeds their words as fragile known cards', () => {
+    const store = createProgressStore(new MemStorage(), () => at('2026-09-01'))
+    store.skipToLesson('u2-l1', course)
+    const st = store.getState()
+    expect(Object.keys(st.completedLessons).sort()).toEqual(['u1-l1', 'u1-l2'])
+    expect(lessonStatus(st, course, 'u2-l1')).toBe('available')
+    expect(Object.keys(st.cards).sort()).toEqual(['word:a', 'word:b', 'word:c'])
+    for (const c of Object.values(st.cards)) {
+      expect(c.stability).toBe(2)
+      expect(c.due > '2026-09-01').toBe(true)
+      expect(masteryOfCard(c)).toBe(2)
+    }
+    expect(st.xpTotal).toBe(0)
+    expect(st.streak.current).toBe(0)
+  })
+  it('keeps existing cards and is a no-op for the first/unknown lesson', () => {
+    const store = createProgressStore(new MemStorage(), () => at('2026-09-01'))
+    store.finishSession(result([[w('a'), false]], null))
+    const before = store.getState().cards['word:a']
+    store.skipToLesson('u1-l2', course)
+    expect(store.getState().cards['word:a']).toEqual(before)
+    const snap = store.getState()
+    store.skipToLesson('u1-l1', course)
+    store.skipToLesson('nope', course)
+    expect(store.getState()).toBe(snap)
   })
 })
 

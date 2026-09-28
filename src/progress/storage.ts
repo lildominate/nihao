@@ -1,12 +1,14 @@
 // Persistence: one versioned JSON document, safe parsing, migrations, and an
 // observable store (used by ProgressProvider via useSyncExternalStore).
-import type { ItemRef, LessonResult, Settings, SrsCard } from '../types'
+import type { Course, ItemRef, LessonResult, Settings } from '../types'
+import { course as defaultCourse } from '../data/course'
+import { migrateCard, type ProgressCard } from './fsrs'
 import type { ProgressState } from './index'
-import { applySession, clampSettings, DEFAULT_SETTINGS, initialState } from './logic'
+import { applySession, clampSettings, DEFAULT_SETTINGS, initialState, skipToLesson } from './logic'
 import { localDay } from './dates'
 
 export const STORAGE_KEY = 'nihao/v1'
-export const CURRENT_VERSION = 1
+export const CURRENT_VERSION = 2
 
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
@@ -24,27 +26,46 @@ const isDay = (v: unknown): v is string => typeof v === 'string' && DAY_RE.test(
 export function migrate(raw: Record<string, unknown>): Record<string, unknown> | null {
   const version = raw.version
   switch (version) {
-    case 1:
+    case 1: {
+      // v1 → v2: SM-2 cards get FSRS memory state (S ≈ interval, D from ease + lapses,
+      // lastReview = due − interval). Due dates are kept, so nothing floods or vanishes.
+      const cards: Record<string, unknown> = {}
+      if (isObj(raw.cards)) {
+        for (const [k, v] of Object.entries(raw.cards)) {
+          const c = sanitizeCard(v)
+          cards[k] = c ? migrateCard(c) : v
+        }
+      }
+      return { ...raw, version: 2, cards }
+    }
+    case 2:
       return raw
     default:
       return null // unknown/newer version → caller falls back to defaults
   }
 }
 
-function sanitizeCard(v: unknown): SrsCard | null {
+function sanitizeCard(v: unknown): ProgressCard | null {
   if (!isObj(v) || !isObj(v.item)) return null
   const kind = v.item.kind
   const id = v.item.id
-  if ((kind !== 'word' && kind !== 'sentence') || typeof id !== 'string') return null
+  if ((kind !== 'word' && kind !== 'sentence' && kind !== 'line') || typeof id !== 'string') return null
   const item: ItemRef = { kind, id }
-  return {
+  const card: ProgressCard = {
     item,
-    ease: Math.max(1.3, num(v.ease, 2.5)),
+    ease: Math.min(3, Math.max(1.3, num(v.ease, 2.5))),
     intervalDays: Math.max(0, num(v.intervalDays, 0)),
     due: isDay(v.due) ? v.due : localDay(),
     reps: Math.max(0, num(v.reps, 0)),
     lapses: Math.max(0, num(v.lapses, 0)),
   }
+  // FSRS fields (v2) — only kept when valid; otherwise derived later by memoryOf().
+  if (typeof v.stability === 'number' && Number.isFinite(v.stability) && typeof v.difficulty === 'number' && Number.isFinite(v.difficulty)) {
+    card.stability = Math.max(0, v.stability)
+    card.difficulty = v.difficulty === 0 ? 0 : Math.min(10, Math.max(1, v.difficulty))
+    card.lastReview = isDay(v.lastReview) ? v.lastReview : null
+  }
+  return card
 }
 
 function sanitizeSettings(v: unknown): Settings {
@@ -57,6 +78,10 @@ function sanitizeSettings(v: unknown): Settings {
     soundEffects: bool('soundEffects'),
     speakingExercises: bool('speakingExercises'),
     dailyGoalXp: num(s.dailyGoalXp, DEFAULT_SETTINGS.dailyGoalXp),
+    // v2 optional settings: kept only when valid (absent → readers apply defaults).
+    ...(s.theme === 'system' || s.theme === 'light' || s.theme === 'dark' ? { theme: s.theme } : {}),
+    ...(typeof s.reduceMotion === 'boolean' ? { reduceMotion: s.reduceMotion } : {}),
+    ...(typeof s.multiVoice === 'boolean' ? { multiVoice: s.multiVoice } : {}),
   })
 }
 
@@ -81,7 +106,7 @@ export function sanitize(doc: Record<string, unknown>): ProgressState {
     for (const [day, xp] of Object.entries(doc.xpByDay)) if (isDay(day)) xpByDay[day] = Math.max(0, num(xp, 0))
   }
 
-  const cards: Record<string, SrsCard> = {}
+  const cards: Record<string, ProgressCard> = {}
   if (isObj(doc.cards)) {
     for (const v of Object.values(doc.cards)) {
       const c = sanitizeCard(v)
@@ -157,6 +182,8 @@ export interface ProgressStore {
   reload(): void
   finishSession(result: LessonResult): { xpEarned: number; streakExtended: boolean }
   updateSettings(patch: Partial<Settings>): void
+  /** v2 placement: see logic.skipToLesson. */
+  skipToLesson(lessonId: string, course?: Course): void
   resetAll(): void
   exportJson(): string
   importJson(json: string): boolean
@@ -195,6 +222,11 @@ export function createProgressStore(storage: StorageLike | null, now: () => Date
     },
     updateSettings(patch) {
       setState({ ...state, settings: clampSettings({ ...state.settings, ...patch }) })
+    },
+    skipToLesson(lessonId, c = defaultCourse) {
+      const t = now()
+      const next = skipToLesson(state, c, lessonId, t, localDay(t))
+      if (next !== state) setState(next)
     },
     resetAll() {
       setState(initialState())
