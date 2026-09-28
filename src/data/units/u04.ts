@@ -8,7 +8,6 @@ export const u04: UnitSpec = {
     {
       title: 'Min familj',
       words: [
-        ['ba-ba', '爸爸', 'bà ba', 'pappa', 'noun'],
         ['jia', '家', 'jiā', 'familj/hem/hemma', 'noun', 'Tecknet är en gris under ett tak – förr var en gris i huset ett tecken på ett riktigt hem.'],
         ['wo-men', '我们', 'wǒ men', 'vi/oss', 'pron'],
         ['ta-men', '他们', 'tā men', 'de/dem', 'pron'],

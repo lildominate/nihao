@@ -24,19 +24,19 @@ export const u01: UnitSpec = {
       tip: 'Pinyin är kinesiska skrivet med vårt alfabet. Strecken över vokalerna visar tonen – samma stavelse med olika ton är helt olika ord. Kinesiska elever hälsar på läraren med "lǎo shī hǎo" (ordagrant "lärare bra") när de kommer, och säger "lǎo shī, zài jiàn" (lärare, vi ses) när de går. Titeln står ofta först, följd av ett kommatecken och hälsningen – lyssna efter hǎo (hej) eller zài jiàn (hej då).',
     },
     {
-      title: 'Mamma & frågor',
+      title: 'Mamma & pappa',
       kind: 'standard',
       words: [
         ['ma-ma', '妈妈', 'mā ma', 'mamma', 'noun', 'Nästan som svenska "mamma" – första stavelsen hög och rak, andra kort och lätt.'],
-        ['ma-horse', '马', 'mǎ', 'häst', 'noun', 'Häst. Låter nästan som mamma – lyssna noga på skillnaden!'],
-        ['ma-scold', '骂', 'mà', 'skälla på/skälla ut', 'verb', 'Skälla på någon – säg det bestämt, som ett "nej!".'],
+        ['ba-ba', '爸爸', 'bà ba', 'pappa', 'noun', 'Pappa – bà är kort och bestämt, ba på slutet är lätt.'],
         ['ma-q', '吗', 'ma', '(frågeord)/frågepartikel', 'particle', 'Neutral ton: kort och lätt. Sätt ma sist så blir ett påstående en ja/nej-fråga.'],
       ],
       sentences: [
         ['ma-ma hao', 'hej mamma'],
         ['ma-ma , zai-jian', 'hej då mamma/hejdå mamma/vi ses mamma'],
         ['ni hao ma-q ?', 'mår du bra/hur mår du/hur är det'],
-        ['ma-ma ma-scold ma-horse ma-q ?', 'skäller mamma på hästen/skäller mamma ut hästen'],
+        ['ba-ba hao ma-q ?', 'mår pappa bra/hur mår pappa/är pappa bra'],
+        ['ba-ba , zai-jian', 'hej då pappa/hejdå pappa/vi ses pappa'],
       ],
       tip: 'Gör om ett påstående till en fråga genom att sätta ma sist: nǐ hǎo (hej) → nǐ hǎo ma? (mår du bra?). Inget annat ändras – ingen omvänd ordföljd som på svenska.',
     },
