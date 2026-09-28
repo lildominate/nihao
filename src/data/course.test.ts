@@ -329,3 +329,14 @@ describe('chunk punctuation', () => {
     expect([...acc(bye)].some((x) => acc(hi).has(x))).toBe(false)
   })
 })
+
+describe('fact-check regressions', () => {
+  it('has no "än du" answers and no dj/tj comparisons for zh/ch', () => {
+    for (const x of [...words, ...sentences]) {
+      for (const a of [x.sv, ...(x.svAlt ?? [])]) expect(a).not.toContain(' än du')
+    }
+    const notes = JSON.stringify(course.words)
+    expect(notes).not.toMatch(/(zh|ch)[^"]{0,40}"(dj|tj)"/)
+    expect(notes).not.toMatch(/"(dj|tj)"[^"]{0,40}(zh|ch)/)
+  })
+})

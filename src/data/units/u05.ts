@@ -10,7 +10,7 @@ export const u05: UnitSpec = {
       words: [
         ['he-drink', '喝', 'hē', 'dricka', 'verb'],
         ['shui', '水', 'shuǐ', 'vatten', 'noun'],
-        ['cha', '茶', 'chá', 'te', 'noun', 'ch = "tj" med uppböjd tunga och luftpuff.'],
+        ['cha', '茶', 'chá', 'te', 'noun', 'ch: som zh (tungspetsen böjd upp mot gommen) men med en kraftig luftpuff. Svenska jämförelser är bara ungefärliga.'],
         ['ka-fei', '咖啡', 'kā fēi', 'kaffe', 'noun', 'Lånord – låter nästan som "kaffe". Två höga, raka toner.'],
         ['pi-jiu', '啤酒', 'pí jiǔ', 'öl', 'noun', 'pí är ljudlån från "beer", jiǔ = alkohol (samma ljud som nio).'],
         ['yao-want', '要', 'yào', 'vilja ha/ska ha/behöva', 'verb'],

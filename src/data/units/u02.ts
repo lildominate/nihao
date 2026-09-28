@@ -8,7 +8,7 @@ export const u02: UnitSpec = {
     {
       title: 'Vad heter du?',
       words: [
-        ['jiao', '叫', 'jiào', 'heta/kallas', 'verb', 'j uttalas ungefär som "dj", med tungan mot undre framtänderna.'],
+        ['jiao', '叫', 'jiào', 'heta/kallas', 'verb', 'j: tungspetsen nedåt bakom undre tänderna, mjukt ljud. Svenska jämförelser är bara ungefärliga.'],
         ['shen-me', '什么', 'shén me', 'vad/vilken/vilket', 'pron', 'Står där svaret ska stå: nǐ jiào shén me? → wǒ jiào Ān nà. Ingen omvänd ordföljd!'],
         ['ming-zi', '名字', 'míng zi', 'namn', 'noun'],
         ['xing-surname', '姓', 'xìng', 'heta i efternamn', 'verb'],
@@ -127,7 +127,7 @@ export const u02: UnitSpec = {
         ['gao-xing', '高兴', 'gāo xìng', 'glad/nöjd', 'adj', 'Ordagrant "hög stämning" – humöret är högt uppe.'],
         ['peng-you', '朋友', 'péng you', 'vän/kompis', 'noun'],
         ['de', '的', 'de', '(ägande)/-s', 'particle', 'Visar ägande som svenskans -s: wǒ de = min, nǐ de = din.'],
-        ['zhe', '这', 'zhè', 'den här/det här/detta', 'pron', 'zh uttalas som "dj" med uppböjd tunga.'],
+        ['zhe', '这', 'zhè', 'den här/det här/detta', 'pron', 'zh: tungspetsen böjs upp mot gommen, ingen luftpuff. Svenska jämförelser är bara ungefärliga.'],
         ['na-that', '那', 'nà', 'den där/det där', 'pron', 'Fjärde ton – inte att blanda ihop med nǎ (vilken).'],
         ['nü-shi', '女士', 'nǚ shì', 'fru/damen', 'noun', 'ü som svenskt y: "nyy".'],
         ['shi-de', '是的', 'shì de', 'ja/jo/precis/just det', 'phrase', 'Ett tydligt "ja, det stämmer". Kinesiskan svarar annars ofta med själva verbet: shì (är) eller bù shì (är inte).'],

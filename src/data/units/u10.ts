@@ -90,7 +90,7 @@ export const u10: UnitSpec = {
         ['bei-jing de qiu-tian hen piao-liang', 'hösten i Peking är vacker/hösten i Peking är fin'],
         ['chun-tian lai-come le', 'våren har kommit/våren är här'],
       ],
-      tip: 'Uttal: x (xià) är ett mjukt "sj" med tungan framåt, q (qiū) är ett "tj" med luftpuff. Båda uttalas med leende läppar.',
+      tip: 'Uttal: x (xià) är ett mjukt "sj" med tungan framåt, q (qiū) är som j med en luftpuff. Båda uttalas med leende läppar.',
     },
     {
       title: 'Rädda samtalet',

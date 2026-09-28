@@ -27,7 +27,7 @@ export const u03: UnitSpec = {
       title: 'Siffror 6–10',
       words: [
         ['liu', '六', 'liù', 'sex', 'num'],
-        ['qi-seven', '七', 'qī', 'sju', 'num', 'q = "tj" som i tjugo.'],
+        ['qi-seven', '七', 'qī', 'sju', 'num', 'q: som j (tungspetsen nedåt) men med en luftpuff. Svenska jämförelser är bara ungefärliga.'],
         ['ba', '八', 'bā', 'åtta', 'num', 'Åtta är lyckotalet i Kina.'],
         ['jiu', '九', 'jiǔ', 'nio', 'num', 'Jiǔ låter som 酒 jiǔ (sprit) – nio snapsar är för många!'],
         ['shi-ten', '十', 'shí', 'tio', 'num', 'Tecknet är ett kors: + = tio. Stigande ton, till skillnad från sì (fyra).'],

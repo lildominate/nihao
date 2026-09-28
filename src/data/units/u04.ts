@@ -32,7 +32,7 @@ export const u04: UnitSpec = {
         ['jie-jie', '姐姐', 'jiě jie', 'storasyster/äldre syster', 'noun'],
         ['di-di', '弟弟', 'dì di', 'lillebror/yngre bror', 'noun', 'Fallande ton – lillebror står längre ner i hierarkin.'],
         ['mei-mei', '妹妹', 'mèi mei', 'lillasyster/yngre syster', 'noun'],
-        ['he-and', '和', 'hé', 'och', 'other', 'Binder bara ihop substantiv, inte meningar.'],
+        ['he-and', '和', 'hé', 'och', 'other', 'Binder främst ihop substantiv (du och jag) – inte hela meningar.'],
         ['xiong-di-jie-mei', '兄弟姐妹', 'xiōng dì jiě mèi', 'syskon', 'noun'],
       ],
       sentences: [
@@ -51,7 +51,7 @@ export const u04: UnitSpec = {
         ['hai-zi', '孩子', 'hái zi', 'barn', 'noun'],
         ['er-zi', '儿子', 'ér zi', 'son', 'noun'],
         ['nü-er', '女儿', 'nǚ ér', 'dotter', 'noun', 'nǚ: ü som svenskt y med tredje ton.'],
-        ['zhang-fu', '丈夫', 'zhàng fu', 'man/make/äkta man', 'noun'],
+        ['zhang-fu', '丈夫', 'zhàng fu', 'make/man', 'noun'],
         ['qi-zi', '妻子', 'qī zi', 'fru/hustru', 'noun'],
         ['nan-peng-you', '男朋友', 'nán péng you', 'pojkvän', 'noun'],
         ['nü-peng-you', '女朋友', 'nǚ péng you', 'flickvän', 'noun'],
