@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Course, Exercise, ItemRef } from '../types'
 import { fixtureCourse as course } from './fixture.test-data'
-import { confusablePinyin, confusableSv, generateLessonExercises, generateReviewExercises, generateToneDrill, preferredTypes, spreadOut, unlockedReplyLines } from './generate'
+import { confusablePinyin, confusableSv, generateLessonExercises, generateReviewExercises, generateToneDrill, makeRng, preferredTypes, toneLesson, spreadOut, unlockedReplyLines } from './generate'
 import { itemInfo, itemKey, syllableHanzi, voiceHint } from './items'
 import { checkBuild } from './check'
 import { syllableBase, syllableTone, withTone } from './pinyinUtil'
@@ -90,9 +90,10 @@ describe('generateLessonExercises (standard)', () => {
     expect(s.length).toBeGreaterThanOrEqual(12)
     expect(s.length).toBeLessThanOrEqual(18)
     const types = new Set(s.map((e) => e.type))
-    for (const t of ['match-pairs', 'type-pinyin'] as const) expect(types).toContain(t)
+    for (const t of ['match-pairs', 'sv-to-pinyin'] as const) expect(types).toContain(t)
+    expect(types).not.toContain('type-pinyin') // learner opted out of free-text typing
     expect(types.has('build-pinyin') || types.has('build-sv')).toBe(true)
-    expect(types.has('speak')).toBe(true)
+    expect(types.has('speak')).toBe(false) // mic exercises live in Tallabbet only (iOS recognition hung lessons)
   })
 
   it('ramps: recognition before production', () => {
@@ -125,7 +126,7 @@ describe('generateLessonExercises (standard)', () => {
 
 describe('tones and checkpoint lessons', () => {
   it('tones lesson is mostly tone-pick + listening', () => {
-    const e = scored(generateLessonExercises(lesson('u1-t'), course, { seed: 4 }))
+    const e = scored(toneLesson(lesson('u1-t'), course, {}, makeRng({ seed: 4 })))
     const toneish = e.filter((x) => x.type === 'tone-pick' || x.type === 'listen-choose').length
     expect(toneish / e.length).toBeGreaterThan(0.6)
     expect(e.length).toBeGreaterThanOrEqual(12)
@@ -284,9 +285,9 @@ describe('adaptive by mastery', () => {
     const high = generateLessonExercises(l, v2course, { seed: 3, speaking: true, mastery: () => 5 })
     expect(high.some((e) => e.type === 'intro')).toBe(false)
     const prod = high.filter((e) => ['type-pinyin', 'speak', 'shadow', 'listen-build', 'build-pinyin', 'sv-to-pinyin'].includes(e.type)).length
-    expect(prod / scored(high).length).toBeGreaterThan(0.6)
+    expect(prod / scored(high).length).toBeGreaterThanOrEqual(0.5)
     expect(types(high)).toContain('listen-build')
-    expect(types(high)).toContain('shadow')
+    expect(types(high)).not.toContain('shadow')
   })
 
   it('mastery 2–3 → no intros, fill-blank appears', () => {
@@ -312,7 +313,7 @@ describe('adaptive by mastery', () => {
     const high = generateReviewExercises(items, v2course, { seed: 1, mastery: () => 5 })
     const recog = (ex: Exercise[]) => ex.filter((e) => e.type === 'listen-choose' || e.type === 'pinyin-to-sv').length
     expect(recog(low)).toBeGreaterThan(recog(high))
-    expect(high.filter((e) => e.type === 'type-pinyin').length).toBeGreaterThanOrEqual(3)
+    expect(high.filter((e) => e.type === 'type-pinyin').length).toBe(0) // typing is converted to pinyin choices
   })
 })
 

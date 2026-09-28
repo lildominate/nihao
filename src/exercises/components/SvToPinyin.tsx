@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { speak } from '../../speech'
+import { wordByPinyin } from '../items'
 import { PinyinText } from '../../speech/PinyinText'
 import { infoFor } from './lineInfo'
 import { explainPinyinChoice } from './explain'
@@ -20,7 +22,12 @@ export function SvToPinyin({ ex, course, settings, verdict, setChecker }: ExProp
         options={ex.options}
         answer={ex.answer}
         selected={sel}
-        onSelect={setSel}
+        onSelect={(o) => {
+          setSel(o)
+          // Hear each option when tapped (hanzi drives TTS; unknown pinyin stays silent).
+          const hanzi = o === ex.answer ? info.hanzi : wordByPinyin(course, o)?.hanzi
+          if (hanzi) void speak(hanzi, { rate: settings.speechRate })
+        }}
         verdict={verdict}
         settings={settings}
         render={(o) => <PinyinText pinyin={o} colored={settings.toneColors} className="text-xl" />}

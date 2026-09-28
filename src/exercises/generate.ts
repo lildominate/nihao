@@ -60,7 +60,7 @@ export interface ReviewOpts {
   multiVoice?: boolean
 }
 
-function makeRng(o?: { rng?: Rng; seed?: number }): Rng {
+export function makeRng(o?: { rng?: Rng; seed?: number }): Rng {
   if (o?.rng) return o.rng
   if (o?.seed != null) return mulberry32(o.seed)
   return Math.random
@@ -528,9 +528,9 @@ export function preferredTypes(kind: ItemRef['kind'], mastery: number, speaking:
   const stage = mastery <= 1 ? 0 : mastery <= 3 ? 1 : 2
   const table: Record<ItemRef['kind'], Weighted[][]> = {
     word: [
-      [['listen-choose', 2], ['pinyin-to-sv', 2], ['tone-pick', 0.5], ['sv-to-pinyin', 0.5]],
-      [['sv-to-pinyin', 2], ['type-pinyin', 1.5], ['listen-choose', 0.7], ['tone-pick', 0.5], ['speak', sp * 0.5]],
-      [['type-pinyin', 2.5], ['speak', sp * 1.5], ['sv-to-pinyin', 0.3], ['tone-pick', 0.3]],
+      [['listen-choose', 2], ['pinyin-to-sv', 2], ['sv-to-pinyin', 0.5]],
+      [['sv-to-pinyin', 2], ['type-pinyin', 1.5], ['listen-choose', 0.7], ['speak', sp * 0.5]],
+      [['type-pinyin', 2.5], ['speak', sp * 1.5], ['sv-to-pinyin', 0.3]],
     ],
     sentence: [
       [['build-sv', 2], ['listen-choose', 1], ['pinyin-to-sv', 1], ['fill-blank', 0.3]],
@@ -726,7 +726,8 @@ function standardLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rng)
   return interleave(ordered, reviews, Math.min(head.length, ordered.length))
 }
 
-function toneLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rng): Exercise[] {
+/** Tone-focused lesson (currently unused in the path; kept for an optional tone course). */
+export function toneLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rng): Exercise[] {
   let words = uniq(lesson.newWords).filter((id) => course.words[id])
   const introduce = words.length > 0
   if (!words.length) {
@@ -807,6 +808,12 @@ function checkpointLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rn
 }
 
 /** HVPT: mark tone-picks for voice rotation when multiVoice is on. */
+/** The learner chose not to type pinyin: free-text answers become "pick the right pinyin". */
+// Also: iOS speech recognition hung the lesson on 'speak', so mic exercises stay in Tallabbet only.
+function noTyping(list: Exercise[], course: Course, rng: Rng): Exercise[] {
+  return list.map((e) => (e.type === 'type-pinyin' ? choiceExercise(course, 'sv-to-pinyin', e.item, { rng }) ?? e : e))
+}
+
 function withVoice(list: Exercise[], multiVoice?: boolean): Exercise[] {
   if (!multiVoice) return list
   return list.map((e) => (e.type === 'tone-pick' ? ({ ...e, voice: 'rotate' } satisfies HintedExercise) : e))
@@ -826,15 +833,18 @@ export function choiceExercise(
 }
 
 export function generateLessonExercises(lesson: Lesson, course: Course, opts: GenOpts = {}): Exercise[] {
+  opts = { ...opts, speaking: false }
   const rng = makeRng(opts)
+  // 'tones' lessons are taught like normal vocabulary: learners found early tone-picking to be pure guessing.
+  // Tone training lives in the tone drill, Tonjakt and Tallabbet instead.
   const list =
-    lesson.kind === 'tones' ? toneLesson(lesson, course, opts, rng)
-    : lesson.kind === 'checkpoint' ? checkpointLesson(lesson, course, opts, rng)
+    lesson.kind === 'checkpoint' ? checkpointLesson(lesson, course, opts, rng)
     : standardLesson(lesson, course, opts, rng)
-  return withVoice(list, opts.multiVoice)
+  return withVoice(noTyping(list, course, rng), opts.multiVoice)
 }
 
 export function generateReviewExercises(items: ItemRef[], course: Course, opts: ReviewOpts = {}): Exercise[] {
+  opts = { ...opts, speaking: false }
   const rng = makeRng(opts)
   const seen = new Set<string>()
   const valid = items.filter((r) => {
@@ -855,7 +865,7 @@ export function generateReviewExercises(items: ItemRef[], course: Course, opts: 
     const mp = matchPairs(ctx, shuffle(wordIds, rng).slice(0, 5))
     if (mp) out.push(mp)
   }
-  return withVoice(order([], out.map((ex) => ({ ex, prio: 0 })), rng), opts.multiVoice)
+  return withVoice(noTyping(order([], out.map((ex) => ({ ex, prio: 0 })), rng), course, rng), opts.multiVoice)
 }
 
 export function generateToneDrill(wordIds: string[], course: Course, count = 12, opts: { rng?: Rng; seed?: number; multiVoice?: boolean } = {}): Exercise[] {
