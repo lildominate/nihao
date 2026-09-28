@@ -43,3 +43,14 @@ describe('real course × generator', () => {
     expect(generateToneDrill(Object.keys(course.words), course, 15).length).toBeGreaterThan(0)
   })
 })
+
+describe('build answers', () => {
+  it('accepts an equivalent course sentence ("hej lärare" = nǐ hǎo, lǎo shī)', async () => {
+    const { checkBuild } = await import('./exercises/check')
+    const target = Object.values(course.sentences).find((s) => s.chunks.join(' ').replace(/ ,/g, '') === 'lǎo shī hǎo')!
+    expect(target).toBeTruthy()
+    expect(checkBuild('build-pinyin', target, ['nǐ', 'hǎo', 'lǎo shī'], course)).toBe(true)
+    expect(checkBuild('build-pinyin', target, ['lǎo shī', 'hǎo'], course)).toBe(true)
+    expect(checkBuild('build-pinyin', target, ['hǎo', 'lǎo shī'], course)).toBe(false)
+  })
+})

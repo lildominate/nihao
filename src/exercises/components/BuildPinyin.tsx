@@ -15,7 +15,7 @@ export function BuildPinyin({ ex, course, settings, verdict, setChecker }: ExPro
   useEffect(() => {
     if (!s) return setChecker(null)
     setChecker(picked.length === 0 ? null : () =>
-      checkBuild('build-pinyin', s, picked.map((i) => ex.tiles[i]))
+      checkBuild('build-pinyin', s, picked.map((i) => ex.tiles[i]), course)
         ? { status: 'correct' }
         : { status: 'wrong', answer: { pinyin: s.chunks.join(' ') }, explain: explainBuild(picked.map((i) => ex.tiles[i]), s.chunks) })
   }, [picked, ex, s, setChecker])
