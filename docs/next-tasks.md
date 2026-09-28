@@ -21,3 +21,8 @@ Dishes and drinks: 炒饭 chǎo fàn · 米饭 mǐ fàn · 面条 miàn tiáo ·
 Customer orders: wǒ yào chǎo fàn · wǒ yào yī fèn jiǎo zi · wǒ yào niú ròu miàn · qǐng gěi wǒ liǎng bēi nǎi chá · bù yào là jiāo · bù yào tài là · kě yǐ gěi wǒ shuǐ ma? · wǒ yào gōng bǎo jī dīng hé mǐ fàn · qǐng gěi wǒ men zhàng dān (more common: mǎi dān) · hěn hǎo chī!
 
 Game idea: you are the chef; a customer orders in Chinese (audio + pinyin); tap the ingredients or dish to serve before a patience timer runs out; serving correctly earns tips and XP.
+
+## 3. Snake feedback from the learner (2026-09-28, playtested on iPhone)
+- Steering is hard. Ideas: slower base speed (e.g. 420 ms per step instead of 330), bigger swipe tolerance and let a swipe anywhere on screen steer, a larger on-screen arrow pad, optionally "tap left/right half to turn" mode, and a ghost preview of the next direction.
+- Too little time after eating a token, because new tokens appear immediately. Add a ~1.2 s breather: freeze the board, show ✓ plus the word/pinyin plus audio, then fade the next prompt's tokens in (spawned away from the head), maybe with a 3-2-1 "ready" pulse.
+- Consider a "Lugnt läge" (calm mode) toggle with no speed ramp.
