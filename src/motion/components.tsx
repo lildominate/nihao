@@ -5,6 +5,7 @@ import { Panda } from '../mascot/Panda'
 import { haptic, type HapticKind } from './haptics'
 import { celebrate, type CelebrateKind } from './particles'
 import { useReducedMotion } from './reduced'
+import { SPLASH_MIN_MS, splashCanLeave, splashHoldMs } from './splashTiming'
 
 // ─── CountUp ─────────────────────────────────────────────────
 
@@ -89,15 +90,17 @@ export function Transition({ swapKey, kind = 'fade', children, className, direct
 
 // ─── Splash ──────────────────────────────────────────────────
 
-/** Full-screen splash/loading screen with the mascot. Calls onDone after ~1.2 s (or once `message` is typed out and `ready`). */
-export function Splash({ message, onDone, minMs = 1200, ready = true, tagline = 'lär dig tala kinesiska' }: {
+/** Full-screen splash/loading screen with the mascot. Calls onDone after ~1.5 s (or once `message` is typed out and `ready`). */
+export function Splash({ message, onDone, minMs = SPLASH_MIN_MS, ready = true, tagline = 'lär dig tala kinesiska', version }: {
   message?: string
   onDone?: () => void
-  /** Minimum time on screen. Default 1200 ms (reduced motion: 600 ms). */
+  /** Minimum time on screen. Default 1500 ms (also with reduced motion, so the version can be read). */
   minMs?: number
   /** Keep showing (with shimmer) until true, for real loading work. Default true. */
   ready?: boolean
   tagline?: string
+  /** Shown on its own legible line under the tagline. */
+  version?: string
 }) {
   const reduced = useReducedMotion()
   const [typed, setTyped] = useState(0)
@@ -109,7 +112,7 @@ export function Splash({ message, onDone, minMs = 1200, ready = true, tagline = 
   const typedAll = reduced || typed >= msgLen
 
   useEffect(() => {
-    const t = setTimeout(() => setMinPassed(true), reduced ? Math.min(minMs, 600) : minMs)
+    const t = setTimeout(() => setMinPassed(true), splashHoldMs(minMs))
     return () => clearTimeout(t)
   }, [minMs, reduced])
 
@@ -126,7 +129,7 @@ export function Splash({ message, onDone, minMs = 1200, ready = true, tagline = 
   }, [message, msgLen, reduced])
 
   useEffect(() => {
-    if (leaving || !minPassed || !typedAll || !ready) return
+    if (leaving || !splashCanLeave({ minPassed, typedAll, ready })) return
     // let a typed message breathe a moment, then fade out
     const t = setTimeout(() => setLeaving(true), msgLen && !reduced ? 350 : 0)
     return () => clearTimeout(t)
@@ -159,6 +162,7 @@ export function Splash({ message, onDone, minMs = 1200, ready = true, tagline = 
           </span>
         </h1>
         <p className="mo-splash-tag">{tagline}</p>
+        {version && <p className="mo-splash-version" aria-label={`Version ${version}`}>{version}</p>}
         <p className="mo-splash-msg" aria-live="polite">
           {message ? <>{reduced ? message : message.slice(0, typed)}{!typedAll && <span className="mo-caret" aria-hidden="true" />}</> : ' '}
         </p>

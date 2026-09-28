@@ -1,5 +1,6 @@
 // Full-screen session flow: optional tip card → LessonPlayer → celebration.
 import { useState, type ReactNode } from 'react'
+import { finishPart } from '../exercises/parts'
 import type { Exercise, Lesson, LessonResult } from '../types'
 import { LessonPlayer } from '../exercises'
 import type { LessonSummary } from '../exercises/LessonPlayer'
@@ -17,7 +18,7 @@ import { BoltIcon, ClockIcon, CloseIcon, FlameIcon, SparkleIcon, TargetIcon } fr
 import { unitColor } from './util'
 
 export type SessionSpec =
-  | { kind: 'lesson'; lesson: Lesson; unitIndex: number; exercises: Exercise[] }
+  | { kind: 'lesson'; lesson: Lesson; unitIndex: number; exercises: Exercise[]; part?: { index: number; count: number } }
   | { kind: 'practice'; title: string; emoji: string; exercises: Exercise[] }
 
 type Stage =
@@ -28,7 +29,8 @@ type Stage =
 export function Session({ spec, onClose }: { spec: SessionSpec; onClose: () => void }) {
   const { finishSession } = useProgress()
   const [stage, setStage] = useState<Stage>(() => (spec.kind === 'lesson' && spec.lesson.tip ? { name: 'tip' } : { name: 'play' }))
-  const title = spec.kind === 'lesson' ? spec.lesson.title : spec.title
+  const part = spec.kind === 'lesson' && spec.part && spec.part.count > 1 ? spec.part : null
+  const title = spec.kind === 'lesson' ? (part ? `${spec.lesson.title} · Del ${part.index + 1}/${part.count}` : spec.lesson.title) : spec.title
   const [summary, setSummary] = useState<LessonSummary | null>(null)
 
   return (
@@ -51,7 +53,9 @@ export function Session({ spec, onClose }: { spec: SessionSpec; onClose: () => v
             onExit={onClose}
             onSummary={setSummary}
             onFinish={(result) => {
-              const full: LessonResult = { ...result, source: result.source ?? (spec.kind === 'lesson' ? 'lesson' : 'review') }
+              let full: LessonResult = { ...result, source: result.source ?? (spec.kind === 'lesson' ? 'lesson' : 'review') }
+              // Only the last part completes (and unlocks past) the lesson; earlier parts still earn XP + SRS.
+              if (spec.kind === 'lesson' && part && !finishPart(spec.lesson.id, part.index, part.count)) full = { ...full, lessonId: null }
               const r = finishSession(full)
               setStage({ name: 'done', ...r, result: full })
             }}

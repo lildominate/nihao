@@ -36,6 +36,8 @@ export type MasteryFn = (item: ItemRef) => number
 
 export interface GenOpts {
   knownWordIds?: string[]
+  /** Cap on scored exercises (short lesson parts use ~10; default 18). */
+  maxScored?: number
   speaking?: boolean
   /** Inject an RNG (tests) … */
   rng?: Rng
@@ -718,11 +720,12 @@ function standardLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rng)
 
   // Interleaved review (~25 % of the scored total).
   const exclude = new Set([...words.map((id) => itemKey(wordRef(id))), ...sents.map((id) => itemKey(sentenceRef(id)))])
-  const slots = Math.round(MAX_SCORED * REVIEW_SHARE) // 5 of 18
+  const max = opts.maxScored ?? MAX_SCORED
+  const slots = Math.round(max * REVIEW_SHARE) // 5 of 18
   const reviews = reviewSlotExercises(ctx, opts.reviewItems, exclude, slots, speaking)
 
   const fixed = head.filter(isScored).length
-  const ordered = order(head, trim(tagged, MAX_SCORED - reviews.length, fixed, rng), rng)
+  const ordered = order(head, trim(tagged, max - reviews.length, fixed, rng), rng)
   return interleave(ordered, reviews, Math.min(head.length, ordered.length))
 }
 
@@ -804,7 +807,7 @@ function checkpointLesson(lesson: Lesson, course: Course, opts: GenOpts, rng: Rn
     sp.forEach((r) => push(tagged, { type: 'speak', item: r }, 2))
   }
   dialogueExercises(ctx, unlockedReplyLines(course, lesson.id, opts.completedLessonIds), 2).forEach((ex) => push(tagged, ex, 1))
-  return order([], trim(tagged, MAX_SCORED, 0, rng), rng)
+  return order([], trim(tagged, opts.maxScored ?? MAX_SCORED, 0, rng), rng)
 }
 
 /** HVPT: mark tone-picks for voice rotation when multiVoice is on. */

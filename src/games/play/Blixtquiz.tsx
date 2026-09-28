@@ -1,8 +1,9 @@
 // OWNER: Games agent. Blixtquiz — as many right answers as possible in 60 s. Combos multiply.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Word } from '../../types'
-import { PinyinText, playSfx, SpeakButton, speak } from '../../speech'
+import { hasChineseVoice, PinyinText, playSfx, speak, stopSpeaking } from '../../speech'
 import { celebrate, haptic } from '../../motion'
+import { AudioSequencer, browserAudioDeps } from '../logic/audioQueue'
 import { pickOptions, svLabel, WordDeck } from '../logic/pool'
 import { BLIXT_DURATION_MS, blixtMultiplier, blixtPoints, blixtTimeBonus } from '../logic/scoring'
 import { AnswerTracker, wordRef } from '../logic/session'
@@ -16,6 +17,11 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
   const deck = useRef<WordDeck>(null as unknown as WordDeck)
   const tracker = useRef(new AnswerTracker())
   const [paused, setPaused] = usePause()
+  // One word at a time: cues queue up, are never cut off by a fast answer, and stale ones die on exit/restart/pause.
+  const seq = useRef<AudioSequencer>(null as unknown as AudioSequencer)
+  if (!seq.current) seq.current = new AudioSequencer(browserAudioDeps((t) => speak(t), () => stopSpeaking(), () => hasChineseVoice()), { silentMs: 1300 })
+  const pausedRef = useRef(false)
+  const pendingAdvance = useRef(false)
 
   const makeQ = (n: number): Q => {
     const word = deck.current.next()
@@ -39,16 +45,38 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
   const shown = useRef(-1)
   const comboRef = useRef<HTMLSpanElement>(null)
 
-  // Listening questions speak on arrival.
+  // Listening questions speak on arrival (queued behind whatever is still playing).
   useEffect(() => {
     if (q.kind !== 'listen') return
-    const t = window.setTimeout(() => { if (!over.current) void speak(q.word.hanzi) }, 120)
+    const t = window.setTimeout(() => { if (!over.current && !pausedRef.current) void seq.current.enqueue(q.word.hanzi) }, 120)
     return () => window.clearTimeout(t)
   }, [q])
+
+  // Leaving the game (unmount = exit or restart) silences and invalidates all audio.
+  useEffect(() => {
+    const s = seq.current
+    over.current = false // StrictMode re-runs effects: undo the cleanup below
+    return () => { over.current = true; s.cancel() }
+  }, [])
+
+  const goNext = () => {
+    pendingAdvance.current = false
+    setFeedback(null)
+    setQ((cur) => makeQ(cur.n + 1))
+  }
+  useEffect(() => {
+    pausedRef.current = paused
+    if (paused) { seq.current.cancel(); return }
+    if (pendingAdvance.current && !over.current) goNext()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused])
+
+  const noVoice = !hasChineseVoice()
 
   const finish = () => {
     if (over.current) return
     over.current = true
+    seq.current.cancel()
     playSfx('complete')
     const result = tracker.current.result(playMs.current)
     onEnd({
@@ -87,7 +115,7 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
     tracker.current.record(wordRef(q.word.id), ok)
     setFeedback({ picked: opt.id, ok })
     if (ok) {
-      if (q.kind === 'sv2py') void speak(q.word.hanzi)
+      if (q.kind === 'sv2py') void seq.current.enqueue(q.word.hanzi)
       playSfx('correct')
       haptic('success')
       const c = combo + 1
@@ -107,17 +135,19 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
         celebrate('stars', { from: comboRef.current ?? undefined })
       }
     } else {
-      void speak(q.word.hanzi)
+      if (q.kind === 'sv2py') void seq.current.enqueue(q.word.hanzi) // listen questions already played the word
       playSfx('wrong')
       haptic('error')
       deck.current.miss(q.word)
       setCombo(0)
     }
-    window.setTimeout(() => {
+    // Next question only once the word has finished playing (and the feedback was visible long enough).
+    const minShow = ok ? 380 : 1100
+    void Promise.all([seq.current.idle(), new Promise((r) => window.setTimeout(r, minShow))]).then(() => {
       if (over.current) return
-      setFeedback(null)
-      setQ((cur) => makeQ(cur.n + 1))
-    }, ok ? 380 : 1100)
+      if (pausedRef.current) { pendingAdvance.current = true; return }
+      goNext()
+    })
   }
 
   const mult = blixtMultiplier(combo)
@@ -136,7 +166,7 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
 
   return (
     <GameFrame title="Blixtquiz" paused={paused} setPaused={setPaused} reduced={reduced} hud={hud}
-      onExit={() => onExit(tracker.current.answered ? tracker.current.result(playMs.current) : null)}>
+      onExit={() => { seq.current.cancel(); onExit(tracker.current.answered ? tracker.current.result(playMs.current) : null) }}>
       <div className="flex h-full flex-col px-4 pb-4">
         <div className="mt-1 h-3 overflow-hidden rounded-full bg-surface-2">
           <div ref={barRef} className="h-full w-full origin-left rounded-full bg-warn will-change-transform" />
@@ -146,13 +176,26 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
           {q.kind === 'listen' ? (
             <>
               <span className="text-sm font-extrabold uppercase tracking-wider text-ink-muted">Vad betyder det?</span>
-              <SpeakButton hanzi={q.word.hanzi} size="lg" label="Lyssna igen" />
-              {feedback && <PinyinText pinyin={q.word.pinyin} colored={toneColors} className="g-pop text-2xl font-black" />}
+              {noVoice ? (
+                <>
+                  <PinyinText pinyin={q.word.pinyin} colored={toneColors} className="text-5xl font-black" />
+                  <span className="rounded-full bg-warn-soft px-3 py-1 text-sm font-extrabold text-warn-dark">🔇 Ingen kinesisk röst – läs ordet</span>
+                </>
+              ) : (
+                <>
+                  <button type="button" aria-label="Lyssna igen" onClick={() => { void seq.current.replay(q.word.hanzi) }}
+                    className="press inline-flex h-24 w-24 items-center justify-center rounded-3xl border-b-4 border-sky-dark bg-sky text-white active:translate-y-0.5 active:border-b-2">
+                    <svg viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor" aria-hidden="true"><path d="M4 9.5v5a1 1 0 0 0 1 1h3l4.4 3.7a.8.8 0 0 0 1.3-.6V5.4a.8.8 0 0 0-1.3-.6L8 8.5H5a1 1 0 0 0-1 1Z" /><path d="M16.2 9a4 4 0 0 1 0 6M18.6 6.6a7.4 7.4 0 0 1 0 10.8" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" /></svg>
+                  </button>
+                  {feedback && <PinyinText pinyin={q.word.pinyin} colored={toneColors} className="g-pop text-2xl font-black" />}
+                </>
+              )}
             </>
           ) : (
             <>
               <span className="text-sm font-extrabold uppercase tracking-wider text-ink-muted">Hur säger man…</span>
               <span className="text-center text-3xl font-black">{svLabel(q.word)}</span>
+              {noVoice && feedback && <span className="rounded-full bg-warn-soft px-3 py-1 text-sm font-extrabold text-warn-dark">🔇 Ingen kinesisk röst – läs ordet</span>}
             </>
           )}
         </div>

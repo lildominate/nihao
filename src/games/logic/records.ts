@@ -2,7 +2,7 @@
 
 export const RECORDS_KEY = 'nihao/games/v1'
 
-export type GameId = 'ordregn' | 'memory' | 'blixt' | 'tonjakt' | 'bygg'
+export type GameId = 'ordregn' | 'runner' | 'memory' | 'blixt' | 'tonjakt' | 'bygg'
 
 export interface GameRecord {
   best: number

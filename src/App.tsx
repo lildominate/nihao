@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Dialogue, Lesson } from './types'
 import { course } from './data/course'
 import { generateLessonExercises } from './exercises'
+import { lessonParts, nextPartIndex, PART_MAX_SCORED } from './exercises/parts'
 import { useProgress } from './progress'
 import { isRecognitionAvailable, playSfx, setDefaultSpeechRate, setMultiVoice } from './speech'
 import { MotivationOverlays } from './motivation'
@@ -46,10 +47,14 @@ export default function App() {
   }, [overlay])
 
   const startLesson = (lesson: Lesson, unitIndex: number) => {
-    const exercises = generateLessonExercises(lesson, course, lessonGenOptions(progress, {
-      speaking: settings.speakingExercises && isRecognitionAvailable(),
-    }))
-    setSession({ kind: 'lesson', lesson, unitIndex, exercises })
+    // Short lessons: play the next part (≤3 new words, ~10–13 steps); same lesson id throughout.
+    const parts = lessonParts(lesson, course)
+    const index = nextPartIndex(lesson.id, parts.length)
+    const exercises = generateLessonExercises(parts[index], course, {
+      ...lessonGenOptions(progress, { speaking: settings.speakingExercises && isRecognitionAvailable() }),
+      maxScored: lesson.kind === 'checkpoint' ? 12 : PART_MAX_SCORED,
+    })
+    setSession({ kind: 'lesson', lesson: parts[index], unitIndex, exercises, part: { index, count: parts.length } })
   }
 
   const closeSession = () => {
@@ -61,7 +66,7 @@ export default function App() {
 
   if (import.meta.env.DEV && window.location.hash === '#/design') return <DesignGallery />
 
-  if (splash) return <Splash onDone={() => setSplash(false)} tagline={`lär dig tala kinesiska · ${APP_VERSION}`} />
+  if (splash) return <Splash onDone={() => setSplash(false)} tagline="lär dig tala kinesiska" version={APP_VERSION} />
 
   if (!onboarded) {
     if (placement) {

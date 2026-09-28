@@ -56,4 +56,25 @@ function Blocks() {
   )
 }
 
-export const GAME_ART: Record<GameId, () => React.JSX.Element> = { ordregn: Rain, memory: Cards, blixt: Bolt, tonjakt: Tones, bygg: Blocks }
+function Runner() {
+  return (
+    <svg viewBox="0 0 100 100" className={S} aria-hidden="true">
+      <path d="M50 18 8 92h84L50 18Z" fill="#fff" fillOpacity=".92" />
+      <path d="M50 18 34 92M50 18l16 74" stroke="#a7f3d0" strokeWidth="3" strokeLinecap="round" />
+      <path d="M50 18 8 92M50 18l42 74" stroke="#d9412e" strokeWidth="4" strokeLinecap="round" />
+      <g className="g-drift">
+        <rect x="18" y="34" width="24" height="26" rx="4" fill="none" stroke="#d9412e" strokeWidth="4" />
+        <rect x="21" y="37" width="18" height="10" rx="3" fill="#fff" /><text x="30" y="45" fontSize="7.5" fontWeight="900" textAnchor="middle" fill="#2563eb">nǐ</text>
+        <rect x="58" y="34" width="24" height="26" rx="4" fill="none" stroke="#d9412e" strokeWidth="4" />
+        <rect x="61" y="37" width="18" height="10" rx="3" fill="#fff" /><text x="70" y="45" fontSize="7.5" fontWeight="900" textAnchor="middle" fill="#9333ea">hào</text>
+      </g>
+      <ellipse cx="50" cy="86" rx="13" ry="3.5" fill="#000" opacity=".18" />
+      <circle cx="50" cy="72" r="12" fill="#fff" /><circle cx="41" cy="62" r="5" fill="#2b2533" /><circle cx="59" cy="62" r="5" fill="#2b2533" />
+      <ellipse cx="45" cy="72" rx="3.4" ry="4" fill="#2b2533" /><ellipse cx="55" cy="72" rx="3.4" ry="4" fill="#2b2533" />
+      <circle cx="46" cy="71" r="1.2" fill="#fff" /><circle cx="54" cy="71" r="1.2" fill="#fff" />
+      <path d="M40 80q10 6 20 0" stroke="#d9412e" strokeWidth="4" strokeLinecap="round" fill="none" />
+    </svg>
+  )
+}
+
+export const GAME_ART: Record<GameId, () => React.JSX.Element> = { ordregn: Rain, runner: Runner, memory: Cards, blixt: Bolt, tonjakt: Tones, bygg: Blocks }

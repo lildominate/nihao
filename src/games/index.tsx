@@ -12,7 +12,7 @@ import { GAME_ART } from './ui/art'
 import { useGamesReducedMotion, type GameOutcome, type GameProps } from './ui/kit'
 import { ScoreScreen } from './ui/ScoreScreen'
 import { Ordregn } from './play/Ordregn'
-import { Memory } from './play/Memory'
+import { PanpanRunner } from './play/PanpanRunner'
 import { Blixtquiz } from './play/Blixtquiz'
 import { Tonjakt } from './play/Tonjakt'
 import { Meningsbyggaren, sentencesFor } from './play/Meningsbyggaren'
@@ -46,9 +46,9 @@ const GAMES: GameDef[] = [
     gradient: 'from-rose-400 to-purple-500', shadow: 'shadow-[0_5px_0_#7e22ce]', component: Tonjakt,
   },
   {
-    id: 'memory', title: 'Memory', tagline: 'Para ihop ljud och betydelse.',
-    rules: ['Vänd två kort åt gången.', 'Pinyinkorten säger ordet högt. Hitta det svenska kortet som hör ihop.', 'Färre drag och snabbare tid ger mer poäng.'],
-    gradient: 'from-violet-500 to-fuchsia-500', shadow: 'shadow-[0_5px_0_#86198f]', component: Memory,
+    id: 'runner', title: 'Pānpan-språnget', tagline: 'Spring genom rätt port!',
+    rules: ['Svep eller tryck vänster/höger för att springa genom rätt port.', 'Läs det svenska ordet högst upp och välj porten med rätt pinyin. Fel port eller blockerad väg kostar ett ❤️ (du har tre).', 'Det går snabbare, fler portar dyker upp och senare kommer hela fraser. Ca 20 portar per bana.'],
+    gradient: 'from-teal-400 to-emerald-600', shadow: 'shadow-[0_5px_0_#047857]', component: PanpanRunner,
   },
   {
     id: 'bygg', title: 'Meningsbyggaren', tagline: 'Bygg meningar mot klockan.',

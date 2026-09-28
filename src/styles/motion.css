@@ -153,6 +153,7 @@
 }
 .mo-toned .mo-caron svg { display: block; overflow: visible; }
 .mo-splash-tag { margin: 2px 0 0; font-size: 15px; font-weight: 800; color: var(--color-ink-muted); animation: mo-fade-in 400ms ease-out 700ms backwards; }
+.mo-splash-version { margin: 12px 0 0; padding: 4px 14px; border-radius: 999px; font-size: 16px; font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; color: var(--color-ink); background: var(--color-surface-2); border: 1px solid var(--color-line-dark); animation: mo-fade-in 300ms ease-out 250ms backwards; }
 .mo-splash-msg { min-height: 1.4em; margin: 18px 0 0; font-size: 15px; font-weight: 700; color: var(--color-brand-dark); max-width: 280px; }
 .mo-caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -0.12em; background: currentColor; animation: mo-fade-in 0.5s steps(2) infinite alternate; }
 .mo-splash-bar { position: relative; overflow: hidden; width: 140px; height: 6px; margin-top: 18px; border-radius: 999px; background: var(--color-line); animation: mo-fade-in 400ms ease-out 500ms backwards; }

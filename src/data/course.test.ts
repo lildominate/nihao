@@ -2,6 +2,7 @@
 import { pinyin as pinyinPro } from 'pinyin-pro'
 import { describe, expect, it } from 'vitest'
 import { course } from './course'
+import { WELCOME_STEPS } from '../app/welcomeSteps'
 
 const PUNCT = new Set(['?', ',', '!', '.'])
 const HAN = /\p{Script=Han}/gu
@@ -104,6 +105,15 @@ describe('course structure', () => {
   it('ends every unit with a checkpoint and has no tone-drill lesson early (paused on learner request)', () => {
     for (const u of course.units) expect(u.lessons.at(-1)?.kind, u.id).toBe('checkpoint')
     expect(course.units[0].lessons.some((l) => l.kind === 'tones')).toBe(false)
+  })
+
+  it('unit 1 and onboarding do not push the four tones on the beginner', () => {
+    const u1 = course.units[0]
+    const texts = [u1.title, u1.description, ...u1.lessons.flatMap((l) => [l.title, l.tip ?? ''])]
+    for (const t of [u1.title, u1.description, ...u1.lessons.map((l) => l.title)]) expect(t, t).not.toMatch(/toner(na)?|tonträning/i)
+    expect(texts.join(' ')).not.toMatch(/fyra toner/i)
+    expect(WELCOME_STEPS as readonly string[]).not.toContain('tones')
+    expect(WELCOME_STEPS).toHaveLength(4)
   })
 
   it('only uses words introduced at or before the lesson', () => {

@@ -2,7 +2,7 @@ import type { UnitSpec } from '../builder'
 
 export const u01: UnitSpec = {
   title: 'Hälsningar & artighet',
-  description: 'Säg hej, tack och förlåt – och lär dig de fyra tonerna.',
+  description: 'Säg hej, tack och förlåt – och prata om mamma och pappa.',
   emoji: '👋',
   lessons: [
     {

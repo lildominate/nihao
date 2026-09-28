@@ -1,6 +1,5 @@
-// First-run welcome: meet Pānpan → tones → daily goal → sound test → level (beginner or placement test).
+// First-run welcome: meet Pānpan → daily goal → sound test → level (beginner or placement test).
 import { useState, type CSSProperties, type ReactNode } from 'react'
-import type { Tone } from '../types'
 import { useProgress } from '../progress'
 import { hasChineseVoice, isIOS, speak } from '../speech'
 import { Transition } from '../motion'
@@ -9,19 +8,13 @@ import { Button } from '../ui/Button'
 import { ProgressBar } from '../ui/ProgressRing'
 import { BackIcon, ChatIcon, SparkleIcon, SpeakerIcon, TargetIcon, WaveIcon } from './icons'
 import { GOALS, useVoices } from './shared'
+import { WELCOME_STEPS } from './welcomeSteps'
 
-const ORD: Record<number, string> = { 1: '1:a', 2: '2:a', 3: '3:e', 4: '4:e' }
-const TONES: { tone: Tone; py: string; hanzi: string; sv: string; how: string; path: string }[] = [
-  { tone: 1, py: 'mā', hanzi: '妈', sv: 'mamma', how: 'Hög och jämn, som när du sjunger en ton.', path: 'M4 7 H36' },
-  { tone: 2, py: 'má', hanzi: '麻', sv: 'hampa', how: 'Stigande, som en förvånad fråga: ”Va?”', path: 'M4 30 L36 6' },
-  { tone: 3, py: 'mǎ', hanzi: '马', sv: 'häst', how: 'Låg – går ner och sedan upp igen.', path: 'M4 16 Q20 42 36 10' },
-  { tone: 4, py: 'mà', hanzi: '骂', sv: 'skälla', how: 'Skarpt fallande, som ett bestämt ”Nej!”', path: 'M4 6 L36 32' },
-]
 const GOAL_MOOD = ['sleep', 'happy', 'cheer', 'proud'] as const
 
 export function Welcome({ onDone, onPlacement }: { onDone: () => void; onPlacement?: () => void }) {
   const [step, setStep] = useState(0)
-  const steps = 5
+  const steps = WELCOME_STEPS.length
   const last = step === steps - 1
   const next = () => (last ? onDone() : setStep(step + 1))
 
@@ -38,10 +31,9 @@ export function Welcome({ onDone, onPlacement }: { onDone: () => void; onPlaceme
 
         <Transition swapKey={step} kind="slide" className="flex flex-1 flex-col py-4">
           {step === 0 && <Intro />}
-          {step === 1 && <Tones />}
-          {step === 2 && <Goal />}
-          {step === 3 && <SoundTest />}
-          {step === 4 && <Level onPlacement={onPlacement} />}
+          {step === 1 && <Goal />}
+          {step === 2 && <SoundTest />}
+          {step === 3 && <Level onPlacement={onPlacement} />}
         </Transition>
 
         <div className="pb-5">
@@ -81,44 +73,6 @@ function Li({ icon, tone, title, children }: { icon: ReactNode; tone: string; ti
       <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${tone}`}>{icon}</span>
       <span><b className="block font-extrabold">{title}</b><span className="text-sm font-semibold text-ink-muted">{children}</span></span>
     </li>
-  )
-}
-
-function Tones() {
-  const toneColor = (t: Tone) => `var(--tone-${t})`
-  return (
-    <div>
-      <div className="flex items-end gap-2">
-        <div className="min-w-0 flex-1">
-          <h1 className="font-display text-[28px] leading-tight font-semibold">Fyra toner</h1>
-          <p className="mt-1 font-semibold text-ink-muted">
-            Samma stavelse betyder olika saker beroende på <b className="text-ink">tonen</b>. Tryck och lyssna!
-          </p>
-        </div>
-        <Panda mood="think" size={84} className="float -mb-1 shrink-0" />
-      </div>
-      <ul className="stagger-children mt-4 space-y-2.5">
-        {TONES.map((t) => (
-          <li key={t.tone}>
-            <button type="button" onClick={() => void speak(t.hanzi, { slow: true })}
-              className="btn-3d flex w-full items-center gap-3 rounded-2xl border border-line/80 p-3 text-left"
-              style={{ '--face': 'var(--color-surface)', '--edge': 'var(--color-line-dark)', '--shine': 0 } as CSSProperties}>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl font-display text-2xl font-semibold text-white" style={{ background: toneColor(t.tone) }}>{t.py}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-black" style={{ color: toneColor(t.tone) }}>{ORD[t.tone]} tonen · <span className="text-ink">”{t.sv}”</span></span>
-                <span className="block text-sm leading-snug font-semibold text-ink-muted">{t.how}</span>
-              </span>
-              <svg width="40" height="40" viewBox="0 0 40 40" className="shrink-0" aria-hidden="true">
-                <path d={t.path} fill="none" stroke={toneColor(t.tone)} strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 rounded-2xl bg-surface-2 p-3 text-sm font-semibold text-ink-muted">
-        Det finns också en <b className="text-ink">neutral ton</b> – kort och lätt, utan tecken: <b className="text-tone-5">ma</b> (frågeord).
-      </p>
-    </div>
   )
 }
 
@@ -182,7 +136,6 @@ function SoundTest() {
             : <>Installera en kinesisk (mandarin) röst i telefonens inställningar för text till tal. Mer hjälp finns under Profil.</>}
         </p>
       )}
-      <p className="mt-4 text-xs font-semibold text-ink-muted">Tips: båda är 3:e tonen – men framför en annan 3:e ton uttalas den första som en 2:a: ”ní hǎo”.</p>
     </div>
   )
 }
