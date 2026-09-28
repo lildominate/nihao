@@ -1,3 +1,4 @@
+import { APP_VERSION } from '../version'
 // "Profil" — hero, stats, achievements, appearance (theme, reduce motion), settings, voice, backup, reset.
 import { useRef, useState } from 'react'
 import { course } from '../data/course'
@@ -146,6 +147,7 @@ export function ProfileScreen({ onReplayIntro }: { onReplayIntro: () => void }) 
         <section className="space-y-2">
           <Button variant="secondary" className="w-full" onClick={onReplayIntro}>Visa introduktionen igen</Button>
           <ResetButton />
+          <p className="pt-2 text-center text-xs font-bold text-ink-faint">Nǐ hǎo {APP_VERSION}</p>
         </section>
 
         <div className="flex flex-col items-center pt-2 text-center">

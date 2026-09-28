@@ -9,6 +9,7 @@ import { MotivationOverlays } from './motivation'
 import { GamesHub } from './games'
 import { lessonGenOptions, PlacementTest } from './pedagogy'
 import { setTapSound, Splash, Transition } from './motion'
+import { APP_VERSION } from './version'
 import { TabBar } from './app/chrome'
 import { DialogueScreen } from './app/DialogueScreen'
 import { LearnScreen } from './app/LearnScreen'
@@ -60,7 +61,7 @@ export default function App() {
 
   if (import.meta.env.DEV && window.location.hash === '#/design') return <DesignGallery />
 
-  if (splash) return <Splash onDone={() => setSplash(false)} />
+  if (splash) return <Splash onDone={() => setSplash(false)} tagline={`lär dig tala kinesiska · ${APP_VERSION}`} />
 
   if (!onboarded) {
     if (placement) {
