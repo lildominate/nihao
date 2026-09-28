@@ -65,12 +65,12 @@ const GAMES: GameDef[] = [
   {
     id: 'bridge', title: 'Pānpans bro', tagline: 'Bygg bron och hoppa över!',
     rules: ['Läs meningen på svenska (tryck på högtalaren för att lyssna).', 'Tryck på pinyin-bitarna i rätt ordning. Varje rätt bit blir en planka och Pānpan hoppar fram. Fel bit spricker och faller: du förlorar ett ❤️ (du har tre).', 'Bygg klart meningen så springer Pānpan över. Varje bro blir längre. Sex broar per bana.'],
-    gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-[0_5px_0_#be123c]', component: PanpansBro, needsSentences: true, hidden: true, // not in the hub until it has been played through on device
+    gradient: 'from-orange-400 to-rose-500', shadow: 'shadow-[0_5px_0_#be123c]', component: PanpansBro, needsSentences: true,
   },
   {
     id: 'bygg', title: 'Meningsbyggaren', tagline: 'Bygg meningar mot klockan.',
     rules: ['Du ser en mening på svenska.', 'Tryck på pinyinbitarna i rätt ordning.', 'Du har 90 sekunder. Felfria meningar ger dubbla poäng.'],
-    gradient: 'from-emerald-400 to-teal-500', shadow: 'shadow-[0_5px_0_#0f766e]', component: Meningsbyggaren, needsSentences: true,
+    gradient: 'from-emerald-400 to-teal-500', shadow: 'shadow-[0_5px_0_#0f766e]', component: Meningsbyggaren, needsSentences: true, hidden: true,
   },
 ]
 
