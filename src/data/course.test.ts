@@ -101,9 +101,9 @@ describe('course structure', () => {
     }
   })
 
-  it('ends every unit with a checkpoint and has a tones lesson in unit 1', () => {
+  it('ends every unit with a checkpoint and has no tone-drill lesson early (paused on learner request)', () => {
     for (const u of course.units) expect(u.lessons.at(-1)?.kind, u.id).toBe('checkpoint')
-    expect(course.units[0].lessons.some((l) => l.kind === 'tones' && l.tip)).toBe(true)
+    expect(course.units[0].lessons.some((l) => l.kind === 'tones')).toBe(false)
   })
 
   it('only uses words introduced at or before the lesson', () => {

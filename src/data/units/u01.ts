@@ -24,13 +24,12 @@ export const u01: UnitSpec = {
       tip: 'Pinyin är kinesiska skrivet med vårt alfabet. Strecken över vokalerna visar tonen – samma stavelse med olika ton är helt olika ord. Kinesiska elever hälsar på läraren med "lǎo shī hǎo" (ordagrant "lärare bra") när de kommer, och säger "lǎo shī, zài jiàn" (lärare, vi ses) när de går. Titeln står ofta först, följd av ett kommatecken och hälsningen – lyssna efter hǎo (hej) eller zài jiàn (hej då).',
     },
     {
-      title: 'De fyra tonerna',
-      kind: 'tones',
+      title: 'Mamma & frågor',
+      kind: 'standard',
       words: [
-        ['ma-ma', '妈妈', 'mā ma', 'mamma', 'noun', 'Första ton: hög och rak, som när man sjunger en ton. Andra stavelsen är neutral.'],
-        ['ma-hemp', '麻', 'má', 'hampa/domnad', 'noun', 'Andra ton: stiger, som när man frågar "va?". Ovanligt ord – här för att öva tonen.'],
-        ['ma-horse', '马', 'mǎ', 'häst', 'noun', 'Tredje ton: låg, går ner och (om den står sist) upp igen.'],
-        ['ma-scold', '骂', 'mà', 'skälla på/skälla ut', 'verb', 'Fjärde ton: faller snabbt och bestämt, som "nej!".'],
+        ['ma-ma', '妈妈', 'mā ma', 'mamma', 'noun', 'Nästan som svenska "mamma" – första stavelsen hög och rak, andra kort och lätt.'],
+        ['ma-horse', '马', 'mǎ', 'häst', 'noun', 'Häst. Låter nästan som mamma – lyssna noga på skillnaden!'],
+        ['ma-scold', '骂', 'mà', 'skälla på/skälla ut', 'verb', 'Skälla på någon – säg det bestämt, som ett "nej!".'],
         ['ma-q', '吗', 'ma', '(frågeord)/frågepartikel', 'particle', 'Neutral ton: kort och lätt. Sätt ma sist så blir ett påstående en ja/nej-fråga.'],
       ],
       sentences: [
@@ -39,7 +38,7 @@ export const u01: UnitSpec = {
         ['ni hao ma-q ?', 'mår du bra/hur mår du/hur är det'],
         ['ma-ma ma-scold ma-horse ma-q ?', 'skäller mamma på hästen/skäller mamma ut hästen'],
       ],
-      tip: 'Mandarin har fyra toner plus en neutral: 1) mā hög och rak, 2) má stigande, 3) mǎ låg och gungande, 4) mà fallande, samt ma kort och lätt. Tonsandhi: när två tredjetoner kommer efter varandra blir den första en andra ton – nǐ hǎo uttalas "ní hǎo". Pinyin skrivs ändå alltid med original­tonen.',
+      tip: 'Gör om ett påstående till en fråga genom att sätta ma sist: nǐ hǎo (hej) → nǐ hǎo ma? (mår du bra?). Inget annat ändras – ingen omvänd ordföljd som på svenska.',
     },
     {
       title: 'Tack & förlåt',

@@ -54,3 +54,10 @@ describe('build answers', () => {
     expect(checkBuild('build-pinyin', target, ['hǎo', 'lǎo shī'], course)).toBe(false)
   })
 })
+
+describe('removed content', () => {
+  it('review ignores cards for words that no longer exist (e.g. ma-hemp)', () => {
+    const ex = generateReviewExercises([{ kind: 'word', id: 'ma-hemp' }, { kind: 'word', id: 'ni-hao' }], course)
+    expect(ex.every((e) => e.type === 'match-pairs' || course.words[e.item.id] || course.sentences[e.item.id])).toBe(true)
+  })
+})
