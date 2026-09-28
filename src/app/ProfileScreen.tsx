@@ -282,14 +282,18 @@ function Backup() {
     setMsg({ ok: true, text: 'Säkerhetskopian har sparats.' })
   }
 
-  const doImport = async (file: File | undefined) => {
-    if (!file) return
-    const text = await file.text()
-    const ok = importProgress(text)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasted, setPasted] = useState('')
+  const restoreText = (text: string) => {
+    const ok = importProgress(text.trim())
     setMsg(ok ? { ok: true, text: 'Framstegen har återställts från filen.' } : { ok: false, text: 'Filen kunde inte läsas. Är det en säkerhetskopia från Nǐ hǎo?' })
     if (fileRef.current) fileRef.current.value = ''
+    if (ok) { setPasteOpen(false); setPasted('') }
     // Achievements, videos, songs etc. read their restored data on start — reload once.
     if (ok) setTimeout(() => window.location.reload(), 1200)
+  }
+  const doImport = async (file: File | undefined) => {
+    if (file) restoreText(await file.text())
   }
 
   return (
@@ -301,6 +305,19 @@ function Backup() {
           <Button variant="secondary" onClick={doExport}>Exportera</Button>
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>Importera</Button>
         </div>
+        {/* A backup copied as text (e.g. via "Kopiera" in the share sheet or saved in Anteckningar) can be pasted. */}
+        {pasteOpen ? (
+          <div className="space-y-2">
+            <textarea value={pasted} onChange={(e) => setPasted(e.target.value)} rows={4} placeholder="Klistra in säkerhetskopian här…"
+              aria-label="Säkerhetskopia som text" className="w-full rounded-xl border-2 border-line bg-surface-2 p-2 text-xs outline-none focus:border-sky" />
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" onClick={() => { setPasteOpen(false); setPasted('') }}>Avbryt</Button>
+              <Button disabled={!pasted.trim()} onClick={() => restoreText(pasted)}>Återställ</Button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setPasteOpen(true)} className="w-full text-sm font-bold text-sky">Har du kopierat säkerhetskopian som text? Klistra in den här</button>
+        )}
         <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => void doImport(e.target.files?.[0])} />
         {msg && <p className={`rounded-xl p-2.5 text-sm font-bold ${msg.ok ? 'bg-brand-soft text-brand-dark dark:text-brand' : 'bg-danger-soft text-danger'}`}>{msg.text}</p>}
       </Card>
