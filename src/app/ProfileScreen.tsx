@@ -288,6 +288,8 @@ function Backup() {
     const ok = importProgress(text)
     setMsg(ok ? { ok: true, text: 'Framstegen har återställts från filen.' } : { ok: false, text: 'Filen kunde inte läsas. Är det en säkerhetskopia från Nǐ hǎo?' })
     if (fileRef.current) fileRef.current.value = ''
+    // Achievements, videos, songs etc. read their restored data on start — reload once.
+    if (ok) setTimeout(() => window.location.reload(), 1200)
   }
 
   return (

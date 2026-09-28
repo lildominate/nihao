@@ -56,7 +56,16 @@ export type { SessionEvent } from './events'
 
 /** Serialized progress backup (JSON string). */
 export function exportProgress(): string {
-  return getProgressStore().exportJson()
+  // Full backup: progress PLUS every other "nihao/…" key (achievements, quests, video ✓, song
+  // lyrics + translations, game records, lesson parts…) — deleting the iOS home-screen app wipes them all.
+  const extra: Record<string, string> = {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith('nihao/') && k !== STORAGE_KEY) extra[k] = localStorage.getItem(k) ?? ''
+    }
+  } catch { /* storage unavailable: progress only */ }
+  return JSON.stringify({ nihaoBackup: 2, progress: JSON.parse(getProgressStore().exportJson()), extra })
 }
 
 /** v2 placement helper (outside React): completes lessons before `lessonId`, seeds their words. */
@@ -66,6 +75,16 @@ export function skipToLesson(lessonId: string): void {
 
 /** Restores a backup; returns false (and changes nothing) if the JSON is invalid. Updates the live UI. */
 export function importProgress(json: string): boolean {
+  // Accepts the full backup above or an older progress-only one.
+  let doc: { nihaoBackup?: number; progress?: unknown; extra?: Record<string, string> } | null
+  try { doc = JSON.parse(json) } catch { return false }
+  if (doc && doc.nihaoBackup === 2 && doc.progress) {
+    if (!getProgressStore().importJson(JSON.stringify(doc.progress))) return false
+    try {
+      for (const [k, v] of Object.entries(doc.extra ?? {})) if (k.startsWith('nihao/') && typeof v === 'string') localStorage.setItem(k, v)
+    } catch { /* storage unavailable */ }
+    return true
+  }
   return getProgressStore().importJson(json)
 }
 
