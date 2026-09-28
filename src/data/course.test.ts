@@ -178,6 +178,10 @@ describe('pinyin & hanzi', () => {
   const ALLOW = new Set<string>([
     '了:le', // standalone 了 is read liǎo by pinyin-pro; our word is the particle le
     '喂:wéi', // phone "hallå" is said wéi (rising); pinyin-pro gives the dictionary reading wèi
+    '教:jiāo', // standalone 教 is read jiào (education) by pinyin-pro; our word is the verb "teach", jiāo
+    '假:jià', // 请假 (ask for leave): pinyin-pro reads standalone/in-context 假 as jiǎ (fake); here it is jià (leave)
+    'u13-l5-s6', // 导游说英文: pinyin-pro segments 游说 as yóu shuì (lobby); here 说 is shuō (导游 + 说 + 英文)
+    '空:kòng', // 有空 (have free time): pinyin-pro reads 空 as kōng (empty); here it is kòng (free time)
     'u2-l4-s2', // 一点中文: pinyin-pro reads 点中 as "diǎn zhòng" (hit); correct is Zhōng wén
   ])
 
