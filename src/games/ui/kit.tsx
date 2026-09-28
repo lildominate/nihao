@@ -20,10 +20,14 @@ export interface GameOutcome {
   headline?: string
 }
 
+import type { Weights } from '../logic/weighting'
+
 export interface GameProps {
   words: Word[]
   /** Distractor reserve (whole course) — never scored. */
   extra: Word[]
+  /** wordId → draw weight (weak/due words higher). Absent = uniform. */
+  weights?: Weights
   mode: string
   reduced: boolean
   toneColors: boolean

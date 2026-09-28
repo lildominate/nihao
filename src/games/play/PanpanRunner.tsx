@@ -38,11 +38,11 @@ interface Live {
 
 const COUNTDOWN_S = 3
 
-export function PanpanRunner({ words, extra, reduced, toneColors, onEnd, onExit }: GameProps) {
+export function PanpanRunner({ words, weights, extra, reduced, toneColors, onEnd, onExit }: GameProps) {
   const [paused, setPaused] = usePause()
   const [finished, setFinished] = useState(false)
   const deck = useRef<RunnerDeck>(null as unknown as RunnerDeck)
-  if (!deck.current) deck.current = new RunnerDeck(words, extra, sentencesFor(words.map((w) => w.id)))
+  if (!deck.current) deck.current = new RunnerDeck(words, extra, sentencesFor(words.map((w) => w.id)), Math.random, weights)
   const tracker = useRef(new AnswerTracker())
   const asked = useRef<RunnerItem[]>([])
   const live = useRef<Live>({

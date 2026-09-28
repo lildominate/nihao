@@ -1,6 +1,7 @@
 // OWNER: Games agent. Word pool + question/option selection (pure).
 import type { Course, Word } from '../../types'
 import { shuffle, type Rng } from './random'
+import { WeightedPicker, type Weights } from './weighting'
 
 export const MIN_POOL = 8
 
@@ -83,8 +84,12 @@ export class WordDeck {
   private readonly rng: Rng
   private readonly retryAfter: number
 
-  constructor(words: readonly Word[], rng: Rng = Math.random, retryAfter = 3) {
+  private readonly picker: WeightedPicker<Word> | null
+
+  /** With `weights` (see weighting.ts) fresh words are drawn by weight instead of in shuffled rounds. */
+  constructor(words: readonly Word[], rng: Rng = Math.random, retryAfter = 3, weights?: Weights) {
     this.words = words
+    this.picker = weights ? new WeightedPicker(words, (w) => weights[w.id] ?? 1, (w) => w.id, rng) : null
     this.rng = rng
     this.retryAfter = retryAfter
   }
@@ -95,6 +100,9 @@ export class WordDeck {
     let w: Word
     if (dueIdx >= 0) {
       w = this.retries.splice(dueIdx, 1)[0].word
+      this.picker?.note(w.id)
+    } else if (this.picker) {
+      w = this.picker.next()
     } else {
       if (this.queue.length === 0) {
         this.queue = shuffle(this.words, this.rng)

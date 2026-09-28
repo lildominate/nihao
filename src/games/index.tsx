@@ -6,7 +6,8 @@ import { useProgress } from '../progress'
 import { Panda } from '../mascot/Panda'
 import { playSfx } from '../speech'
 import './games.css'
-import { buildWordPool } from './logic/pool'
+import { buildWordPool, MIN_POOL } from './logic/pool'
+import { buildWeights, type Weights } from './logic/weighting'
 import { loadRecords, saveScore, type GameId, type Records } from './logic/records'
 import { GAME_ART } from './ui/art'
 import { useGamesReducedMotion, type GameOutcome, type GameProps } from './ui/kit'
@@ -57,78 +58,119 @@ const GAMES: GameDef[] = [
   },
 ]
 
-type Active =
-  | { def: GameDef; phase: 'intro' | 'play'; words: Word[]; mode: string; run: number }
-  | { def: GameDef; phase: 'done'; words: Word[]; mode: string; run: number; outcome: GameOutcome; best: number; isNewRecord: boolean; xp: number }
+type Phase =
+  | { phase: 'intro' | 'play'; run: number; weights?: Weights }
+  | { phase: 'done'; run: number; weights?: Weights; outcome: GameOutcome; best: number; isNewRecord: boolean; xp: number }
 
 const MODE_KEY = 'nihao/games/mode'
 function loadMode(): string { try { return localStorage.getItem(MODE_KEY) ?? 'normal' } catch { return 'normal' } }
 function saveMode(m: string) { try { localStorage.setItem(MODE_KEY, m) } catch { /* private mode */ } }
 
+export const GAME_IDS: GameId[] = GAMES.map((g) => g.id)
+export const GAME_TITLES: Record<GameId, string> = Object.fromEntries(GAMES.map((g) => [g.id, g.title])) as Record<GameId, string>
+
+/** Pure-ish pick for 'auto': the runner once ≥8 words are known, else Ordregn. */
+export function autoGameId(knownCount: number): GameId { return knownCount >= MIN_POOL ? 'runner' : 'ordregn' }
+
+/**
+ * One game, full-screen: intro → play → score. Words are frozen at mount so the pool
+ * doesn't shift mid-game when finishSession adds cards; weights are recomputed per run.
+ */
+function GameSession({ def, words, onClose, onRecords }: {
+  def: GameDef; words: Word[]; onClose(played: boolean): void; onRecords?(r: Records): void
+}) {
+  const progress = useProgress()
+  const { settings } = progress.state
+  const reduced = useGamesReducedMotion()
+  const extra = useMemo(() => Object.values(course.words), [])
+  const [mode, setMode] = useState(loadMode)
+  const [st, setSt] = useState<Phase>({ phase: 'intro', run: 0 })
+  const stRef = useRef(st)
+  const played = useRef(false)
+  const setState = (n: Phase) => { stRef.current = n; setSt(n) }
+
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  const start = () => {
+    const weights = buildWeights(words, progress)
+    setState({ phase: 'play', run: stRef.current.run + 1, weights })
+  }
+
+  const record = (result: LessonResult | null): number => {
+    if (!result || result.items.length === 0) return 0
+    played.current = true
+    try { return progress.finishSession(result).xpEarned } catch { return 0 }
+  }
+
+  const onEnd = (outcome: GameOutcome) => {
+    const a = stRef.current
+    if (a.phase !== 'play') return
+    const xp = record(outcome.result)
+    played.current = true
+    const r = saveScore(def.id, outcome.score)
+    onRecords?.(r.records)
+    setState({ phase: 'done', run: a.run, weights: a.weights, outcome, best: r.records[def.id]?.best ?? outcome.score, isNewRecord: r.isNewRecord, xp })
+  }
+  const onExit = (partial: LessonResult | null) => {
+    if (stRef.current.phase === 'play') record(partial)
+    onClose(played.current)
+  }
+
+  if (st.phase === 'intro') {
+    return <GameIntro def={def} mode={mode} setMode={setMode} words={words.length} reduced={reduced} onStart={start} onClose={() => onClose(played.current)} />
+  }
+  if (st.phase === 'play') {
+    const G = def.component
+    return <G key={st.run} words={words} extra={extra} weights={st.weights} mode={mode} reduced={reduced} toneColors={settings.toneColors} onEnd={onEnd} onExit={onExit} />
+  }
+  if (st.phase !== 'done') return null
+  return (
+    <ScoreScreen title={def.title} outcome={st.outcome} best={st.best} isNewRecord={st.isNewRecord} xp={st.xp}
+      toneColors={settings.toneColors} reduced={reduced} onAgain={start} onClose={() => onClose(played.current)} />
+  )
+}
+
+/**
+ * Opens a game full-screen at its intro screen (like tapping its card in the hub).
+ * `onDone` fires when the player leaves (Tillbaka on intro/score, or exit mid-game).
+ * 'auto' = runner if ≥8 words known, else Ordregn.
+ */
+export function PlayGame({ gameId, onDone }: { gameId: GameId | 'auto'; onDone: (result: { played: boolean }) => void }) {
+  const progress = useProgress()
+  const [init] = useState(() => {
+    const knownIds = progress.knownWordIds()
+    const pool = buildWordPool(knownIds, course)
+    let id: GameId = gameId === 'auto' ? autoGameId(pool.knownCount) : gameId
+    // Meningsbyggaren needs playable sentences; otherwise fall back to Ordregn.
+    if (id === 'bygg' && sentencesFor(pool.words.map((w) => w.id)).length === 0) id = 'ordregn'
+    return { pool, def: GAMES.find((g) => g.id === id) ?? GAMES[0] }
+  })
+  return <GameSession def={init.def} words={init.pool.words} onClose={(played) => onDone({ played })} />
+}
+
 /** Tab screen listing the games; launches them full-screen itself. */
 export function GamesHub() {
   const progress = useProgress()
-  const { settings } = progress.state
   const reduced = useGamesReducedMotion()
   const knownIds = progress.knownWordIds()
   const knownKey = knownIds.join(',')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const pool = useMemo(() => buildWordPool(knownIds, course), [knownKey])
-  const extra = useMemo(() => Object.values(course.words), [])
   const canBuild = useMemo(() => sentencesFor(pool.words.map((w) => w.id)).length > 0, [pool])
   const [records, setRecords] = useState<Records>(() => loadRecords())
-  const [active, setActive] = useState<Active | null>(null)
-  const [mode, setMode] = useState(loadMode)
-  const activeRef = useRef(active)
-  useEffect(() => { activeRef.current = active })
-
-  useEffect(() => {
-    if (!active) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [active])
+  const [active, setActive] = useState<{ def: GameDef; words: Word[] } | null>(null)
 
   const open = (def: GameDef) => {
     playSfx('tap')
-    setActive({ def, phase: 'intro', words: pool.words, mode, run: 0 })
-  }
-  // Words are frozen per run so the pool doesn't shift mid-game when finishSession adds cards.
-  const start = () => setActive((a) => (a ? { def: a.def, phase: 'play', words: pool.words, mode, run: a.run + 1 } : a))
-
-  const record = (result: LessonResult | null): number => {
-    if (!result || result.items.length === 0) return 0
-    try { return progress.finishSession(result).xpEarned } catch { return 0 }
+    setActive({ def, words: pool.words })
   }
 
-  const onEnd = (outcome: GameOutcome) => {
-    const a = activeRef.current
-    if (!a || a.phase !== 'play') return
-    const xp = record(outcome.result)
-    const r = saveScore(a.def.id, outcome.score)
-    setRecords(r.records)
-    const next: Active = { ...a, phase: 'done', outcome, best: r.records[a.def.id]?.best ?? outcome.score, isNewRecord: r.isNewRecord, xp }
-    activeRef.current = next
-    setActive(next)
-  }
-  const onExit = (partial: LessonResult | null) => {
-    if (activeRef.current?.phase === 'play') record(partial)
-    activeRef.current = null
-    setActive(null)
-  }
-
-  if (active?.phase === 'intro') {
-    return <GameIntro def={active.def} mode={mode} setMode={setMode} words={pool.words.length} reduced={reduced} onStart={start} onClose={() => setActive(null)} />
-  }
-  if (active?.phase === 'play') {
-    const G = active.def.component
-    return <G key={active.run} words={active.words} extra={extra} mode={active.mode} reduced={reduced} toneColors={settings.toneColors} onEnd={onEnd} onExit={onExit} />
-  }
-  if (active?.phase === 'done') {
-    return (
-      <ScoreScreen title={active.def.title} outcome={active.outcome} best={active.best} isNewRecord={active.isNewRecord} xp={active.xp}
-        toneColors={settings.toneColors} reduced={reduced} onAgain={start} onClose={() => setActive(null)} />
-    )
+  if (active) {
+    return <GameSession def={active.def} words={active.words} onRecords={setRecords} onClose={() => setActive(null)} />
   }
 
   return (

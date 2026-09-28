@@ -68,7 +68,8 @@ function Player({ video, done, onDone, onNext, onBack }: { video: Video; done: b
   )
 }
 
-export function VideoCourse({ onClose }: { onClose: () => void }) {
+/** `openNext`: jump straight to the first unwatched video (used by Dagens pass). */
+export function VideoCourse({ onClose, openNext = false }: { onClose: () => void; openNext?: boolean }) {
   const data = useVideoData()
   const { finishSession } = useProgress()
   const [done, setDone] = useState<Done>(loadDone)
@@ -76,6 +77,15 @@ export function VideoCourse({ onClose }: { onClose: () => void }) {
   const [playing, setPlaying] = useState<number | null>(null)
   const started = useRef(Date.now())
   const playlists = useMemo(() => (data ? orderPlaylists(data.playlists) : []), [data])
+  const jumped = useRef(false)
+  useEffect(() => {
+    if (!openNext || jumped.current || !playlists.length) return
+    jumped.current = true
+    for (const p of playlists) {
+      const i = p.videos.findIndex((v) => !done[v.id])
+      if (i >= 0) { setList(p); setPlaying(i); return }
+    }
+  }, [openNext, playlists, done])
 
   const markDone = (v: Video) => {
     if (done[v.id]) return

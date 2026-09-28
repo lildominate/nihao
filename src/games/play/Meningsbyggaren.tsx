@@ -7,6 +7,7 @@ import { celebrate, haptic } from '../../motion'
 import { builderTiles, isNextChunk, playableSentences, sentenceChunks, type Tile } from '../logic/builder'
 import { unitWordIds } from '../logic/pool'
 import { shuffle } from '../logic/random'
+import { sentenceWeight, WeightedPicker } from '../logic/weighting'
 import { BUILDER_DURATION_MS, builderPoints } from '../logic/scoring'
 import { AnswerTracker } from '../logic/session'
 import { floatText, GameFrame, ScorePill, useGameLoop, usePause, type GameProps, type Practised } from '../ui/kit'
@@ -20,12 +21,14 @@ export function sentencesFor(wordIds: string[]): Sentence[] {
 
 interface Round { n: number; s: Sentence; tiles: Tile[] }
 
-export function Meningsbyggaren({ words, reduced, toneColors, onEnd, onExit }: GameProps) {
+export function Meningsbyggaren({ words, weights, reduced, toneColors, onEnd, onExit }: GameProps) {
   const pool = useMemo(() => shuffle(sentencesFor(words.map((w) => w.id))), [words])
   const distractors = useMemo(() => [...new Set(pool.flatMap(sentenceChunks))], [pool])
   const idx = useRef(0)
+  const picker = useRef<WeightedPicker<Sentence> | null>(null)
+  if (weights && !picker.current) picker.current = new WeightedPicker(pool, (s) => sentenceWeight(s, weights), (s) => s.id)
   const make = (n: number): Round => {
-    const s = pool[idx.current++ % pool.length]
+    const s = picker.current ? picker.current.next() : pool[idx.current++ % pool.length]
     return { n, s, tiles: builderTiles(s, distractors) }
   }
   const [round, setRound] = useState<Round>(() => make(0))

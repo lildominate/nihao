@@ -2,13 +2,20 @@
 import { useEffect, useState } from 'react'
 import type { Dialogue, Lesson } from './types'
 import { course } from './data/course'
-import { generateLessonExercises } from './exercises'
+import { generateLessonExercises, generateReviewExercises } from './exercises'
 import { lessonParts, nextPartIndex, PART_MAX_SCORED } from './exercises/parts'
 import { useProgress } from './progress'
 import { isRecognitionAvailable, playSfx, setDefaultSpeechRate, setMultiVoice } from './speech'
 import { MotivationOverlays } from './motivation'
-import { GamesHub } from './games'
-import { lessonGenOptions, PlacementTest } from './pedagogy'
+import { GamesHub, PlayGame } from './games'
+import { lessonGenOptions, PlacementTest, reviewGenOptions } from './pedagogy'
+import { localDay } from './progress'
+import { DailyCard, DayBetween } from './daily/DailyCard'
+import { loadDay, planDay, saveDay } from './daily/plan'
+import type { Craving, DayRecord, Energy, StepKind } from './daily/plan'
+import { VideoCourse } from './videos/VideoCourse'
+import { SongLesson, SONGS } from './songs/SongLesson'
+import { seenDialogues } from './app/util'
 import { setTapSound, Splash, Transition } from './motion'
 import { APP_VERSION } from './version'
 import { TabBar } from './app/chrome'
@@ -33,6 +40,13 @@ export default function App() {
   const [session, setSession] = useState<SessionSpec | null>(null)
   const [dialogue, setDialogue] = useState<Dialogue | null>(null)
   const [splash, setSplash] = useState(true) // once per cold start
+  // Dagens pass: the day's plan, whether we're between steps, and the non-session step layers.
+  const [day, setDay] = useState<DayRecord | null>(() => loadDay(localDay()))
+  const [dayActive, setDayActive] = useState(false)
+  const [between, setBetween] = useState(false)
+  const [gameOpen, setGameOpen] = useState(false)
+  const [videoOpen, setVideoOpen] = useState(false)
+  const [songOpen, setSongOpen] = useState<(typeof SONGS)[number] | null>(null)
 
   useThemeSync(settings)
   useEffect(() => { setDefaultSpeechRate(settings.speechRate) }, [settings.speechRate])
@@ -40,7 +54,7 @@ export default function App() {
   useEffect(() => { setTapSound(() => { if (settings.soundEffects) playSfx('tap') }) }, [settings.soundEffects])
 
   // Lock background scroll while a full-screen layer is open.
-  const overlay = !onboarded || !!session || !!dialogue
+  const overlay = !onboarded || !!session || !!dialogue || gameOpen || videoOpen || !!songOpen || between
   useEffect(() => {
     document.body.style.overflow = overlay ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -57,9 +71,78 @@ export default function App() {
     setSession({ kind: 'lesson', lesson: parts[index], unitIndex, exercises, part: { index, count: parts.length } })
   }
 
+  // ─── Dagens pass ───
+  const nextLesson = () => {
+    for (let ui = 0; ui < course.units.length; ui++) {
+      const lesson = course.units[ui].lessons.find((l) => progress.lessonStatus(l.id) === 'available')
+      if (lesson) return { lesson, ui }
+    }
+    return null
+  }
+  const nextDialogue = () => {
+    const seen = seenDialogues()
+    const done = new Set(Object.keys(progress.state.completedLessons))
+    const open = Object.values(course.dialogues ?? {}).filter((d) => done.has(d.afterLessonId))
+    return open.find((d) => !seen.has(d.id)) ?? open[0] ?? null
+  }
+  const songWithLyrics = () => {
+    try {
+      const all = JSON.parse(localStorage.getItem('nihao/songs/v1') ?? '{}') as Record<string, string>
+      return SONGS.find((s) => all[s.id]?.trim()) ?? null
+    } catch { return null }
+  }
+
+  const runStep = (step: StepKind) => {
+    const speaking = settings.speakingExercises && isRecognitionAvailable()
+    if (step === 'review') {
+      const items = progress.dueItems(15)
+      const pick = items.length ? items : progress.weakItems(12)
+      setSession({ kind: 'practice', title: 'Repetera', emoji: '🔁', exercises: generateReviewExercises(pick, course, reviewGenOptions(progress, { speaking })) })
+    } else if (step === 'lesson') {
+      const n = nextLesson()
+      if (n) startLesson(n.lesson, n.ui); else stepDone()
+    } else if (step === 'dialogue') {
+      const d = nextDialogue()
+      if (d) setDialogue(d); else stepDone()
+    } else if (step === 'song') {
+      const s = songWithLyrics()
+      if (s) setSongOpen(s); else stepDone()
+    } else if (step === 'game') setGameOpen(true)
+    else setVideoOpen(true)
+  }
+
+  const startDay = (energy: Energy, craving: Craving) => {
+    const existing = loadDay(localDay())
+    // Unfinished plan today → continue it; otherwise plan a fresh one.
+    const rec: DayRecord = existing && existing.done < existing.steps.length ? existing : {
+      day: localDay(),
+      steps: planDay(energy, craving, {
+        dueCount: progress.dueItems().length,
+        hasNextLesson: !!nextLesson(),
+        knownWords: progress.knownWordIds().length,
+        hasDialogue: !!nextDialogue(),
+        hasVideo: true,
+        hasSong: !!songWithLyrics(),
+      }),
+      done: 0,
+    }
+    saveDay(rec); setDay(rec); setDayActive(true)
+    runStep(rec.steps[rec.done])
+  }
+
+  /** A step's layer closed: count it and show "Nästa: …". */
+  const stepDone = () => {
+    if (!dayActive || !day) return
+    const rec = { ...day, done: day.done + 1 }
+    saveDay(rec); setDay(rec); setBetween(true)
+  }
+  const nextStep = () => { setBetween(false); if (day) runStep(day.steps[day.done]) }
+  const stopDay = () => { setBetween(false); setDayActive(false); setTab('learn') }
+
   const closeSession = () => {
-    if (session?.kind === 'lesson') setTab('learn')
+    if (session?.kind === 'lesson' && !dayActive) setTab('learn')
     setSession(null)
+    stepDone()
   }
 
   const finishOnboarding = () => { safeSet(ONBOARDED_KEY, '1'); setOnboarded(true); setPlacement(false); setTab('learn') }
@@ -89,7 +172,7 @@ export default function App() {
       <div className="mx-auto min-h-dvh max-w-md px-safe pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:border-x sm:border-line/70">
         <main>
           <Transition swapKey={tab} kind="fade">
-            {tab === 'learn' && <LearnScreen onStartLesson={startLesson} onStartDialogue={setDialogue} />}
+            {tab === 'learn' && <LearnScreen onStartLesson={startLesson} onStartDialogue={setDialogue} top={<DailyCard today={day} onStart={startDay} />} />}
             {tab === 'practice' && <ReviewScreen onStart={setSession} />}
             {tab === 'games' && <GamesHub />}
             {tab === 'words' && <WordsScreen />}
@@ -97,10 +180,14 @@ export default function App() {
           </Transition>
         </main>
       </div>
-      {!session && !dialogue && <TabBar tab={tab} onTab={setTab} reviewBadge={progress.dueItems().length} />}
+      {!overlay && <TabBar tab={tab} onTab={setTab} reviewBadge={progress.dueItems().length} />}
       {session && <Session spec={session} onClose={closeSession} />}
-      {dialogue && <DialogueScreen dialogue={dialogue} onClose={() => setDialogue(null)} />}
-      <MotivationOverlays paused={!!session || !!dialogue} />
+      {dialogue && <DialogueScreen dialogue={dialogue} onClose={() => { setDialogue(null); stepDone() }} />}
+      {gameOpen && <PlayGame gameId="auto" onDone={() => { setGameOpen(false); stepDone() }} />}
+      {videoOpen && <VideoCourse openNext onClose={() => { setVideoOpen(false); stepDone() }} />}
+      {songOpen && <SongLesson song={songOpen} onClose={() => { setSongOpen(null); stepDone() }} />}
+      {between && day && <DayBetween day={day} onNext={nextStep} onStop={stopDay} />}
+      <MotivationOverlays paused={overlay} />
     </div>
   )
 }

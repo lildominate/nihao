@@ -11,7 +11,7 @@ import { burst, floatText, GameFrame, MissMeter, practisedWords, ScorePill, useG
 interface Round { n: number; word: Word; options: Word[] }
 type Feedback = { kind: 'hit' | 'wrong' | 'ground'; picked?: string } | null
 
-export function Ordregn({ words, extra, mode, reduced, toneColors, onEnd, onExit }: GameProps) {
+export function Ordregn({ words, weights, extra, mode, reduced, toneColors, onEnd, onExit }: GameProps) {
   const reverse = mode === 'reverse' // pinyin falls, pick Swedish
   const label = reverse ? svLabel : (w: Word) => w.pinyin
   const byId = useMemo(() => new Map([...extra, ...words].map((w) => [w.id, w])), [words, extra])
@@ -25,7 +25,7 @@ export function Ordregn({ words, extra, mode, reduced, toneColors, onEnd, onExit
     return { n, word, options: pickOptions(word, words, label, 4, Math.random, extra) }
   }
   const [round, setRound] = useState<Round>(() => {
-    deck.current = new WordDeck(words)
+    deck.current = new WordDeck(words, Math.random, 3, weights)
     return makeRound(0)
   })
   const [score, setScore] = useState(0)

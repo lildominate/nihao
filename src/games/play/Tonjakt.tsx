@@ -6,6 +6,7 @@ import { PinyinText, playSfx, speak } from '../../speech'
 import { celebrate, haptic } from '../../motion'
 import { unitWordIds, svLabel } from '../logic/pool'
 import { shuffle } from '../logic/random'
+import { WeightedPicker, type Weights } from '../logic/weighting'
 import { STREAK_METER_MAX, TONJAKT_LIVES, tonjaktLevel, tonjaktPoints, tonjaktSyllables } from '../logic/scoring'
 import { classifySwipe, TONE_INFO, TONE_PATH, tonePrompts, type PlayTone, type Point, type TonePrompt } from '../logic/tones'
 import { AnswerTracker, wordRef } from '../logic/session'
@@ -42,8 +43,13 @@ class PromptDeck {
   private q: TonePrompt[] = []
   private last = ''
   private all: TonePrompt[]
-  constructor(all: TonePrompt[]) { this.all = all }
+  private picker: WeightedPicker<TonePrompt> | null
+  constructor(all: TonePrompt[], weights?: Weights) {
+    this.all = all
+    this.picker = weights ? new WeightedPicker(all, (p) => weights[p.word.id] ?? 1, (p) => p.word.id) : null
+  }
   next(): TonePrompt {
+    if (this.picker) return this.picker.next()
     if (!this.q.length) {
       this.q = shuffle(this.all)
       if (this.q.length > 1 && this.q[this.q.length - 1].word.id === this.last) this.q.reverse()
@@ -56,10 +62,10 @@ class PromptDeck {
 
 interface Round { n: number; prompt: TonePrompt }
 
-export function Tonjakt({ words, reduced, toneColors, onEnd, onExit }: GameProps) {
+export function Tonjakt({ words, weights, reduced, toneColors, onEnd, onExit }: GameProps) {
   const poolIds = useMemo(() => new Set(words.map((w) => w.id)), [words])
   const prompts = useMemo(() => buildPrompts(words), [words])
-  const decks = useRef({ one: new PromptDeck(prompts.one), two: new PromptDeck(prompts.two.length ? prompts.two : prompts.one) })
+  const decks = useRef({ one: new PromptDeck(prompts.one, weights), two: new PromptDeck(prompts.two.length ? prompts.two : prompts.one, weights) })
   const byId = useMemo(() => new Map(Object.values(course.words).map((w) => [w.id, w])), [])
   const tracker = useRef(new AnswerTracker())
   const [paused, setPaused] = usePause()

@@ -12,7 +12,7 @@ import { centerIn, floatText, GameFrame, practisedWords, ScorePill, useGameLoop,
 type Kind = 'listen' | 'sv2py'
 interface Q { n: number; kind: Kind; word: Word; options: Word[] }
 
-export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: GameProps) {
+export function Blixtquiz({ words, weights, extra, reduced, toneColors, onEnd, onExit }: GameProps) {
   const byId = useMemo(() => new Map([...extra, ...words].map((w) => [w.id, w])), [words, extra])
   const deck = useRef<WordDeck>(null as unknown as WordDeck)
   const tracker = useRef(new AnswerTracker())
@@ -29,7 +29,7 @@ export function Blixtquiz({ words, extra, reduced, toneColors, onEnd, onExit }: 
     const label = kind === 'listen' ? svLabel : (w: Word) => w.pinyin
     return { n, kind, word, options: pickOptions(word, words, label, 4, Math.random, extra) }
   }
-  const [q, setQ] = useState<Q>(() => { deck.current = new WordDeck(words); return makeQ(0) })
+  const [q, setQ] = useState<Q>(() => { deck.current = new WordDeck(words, Math.random, 3, weights); return makeQ(0) })
   const [score, setScore] = useState(0)
   const [combo, setCombo] = useState(0)
   const [feedback, setFeedback] = useState<{ picked: string; ok: boolean } | null>(null)

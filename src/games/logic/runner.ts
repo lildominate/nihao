@@ -3,6 +3,7 @@ import type { ItemRef, Sentence, Word } from '../../types'
 import { optionKey, pickOptions, svLabel, WordDeck } from './pool'
 import { sentenceChunks } from './builder'
 import { shuffle, type Rng } from './random'
+import type { Weights } from './weighting'
 
 export const LANES = 3
 export const RUNNER_PROMPTS = 20
@@ -127,11 +128,11 @@ export class RunnerDeck {
   private readonly extra: readonly Word[]
   private readonly lastKeys: string[] = []
 
-  constructor(pool: readonly Word[], extra: readonly Word[], sentences: readonly Sentence[], rng: Rng = Math.random) {
+  constructor(pool: readonly Word[], extra: readonly Word[], sentences: readonly Sentence[], rng: Rng = Math.random, weights?: Weights) {
     this.rng = rng
     this.pool = pool
     this.extra = extra
-    this.words = new WordDeck(pool, rng)
+    this.words = new WordDeck(pool, rng, 3, weights)
     for (const w of [...extra, ...pool]) this.byId.set(w.id, w)
     this.sentences = gateSentences(sentences)
   }
