@@ -12,7 +12,10 @@ import { useReducedMotion } from '../motion'
 export interface SongDef { id: string; title: string; youtubeId: string }
 
 /** The version the learner asked for ("Red Sun in the Sky"). Embedded via YouTube's own player. */
-export const SONGS: SongDef[] = [{ id: 'red-sun', title: 'Red Sun in the Sky', youtubeId: 'OjNpRbNdR7E' }]
+export const SONGS: SongDef[] = [
+  { id: 'red-sun', title: 'Red Sun in the Sky', youtubeId: 'OjNpRbNdR7E' },
+  { id: 'jin-sheng-yuan', title: 'Jīn shēng yuán – 川子', youtubeId: '4v5-532xqY8' },
+]
 
 type Store = Record<string, unknown>
 function load<T>(key: string, id: string, fallback: T): T {
