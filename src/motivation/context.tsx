@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { course } from '../data/course'
-import { localDay, onSessionFinished, useProgress } from '../progress'
+import { displayStreak, localDay, onSessionFinished, useProgress } from '../progress'
 import type { ProgressApi } from '../progress'
 import type { AchievementCtx, AchievementView } from './achievements'
 import { achievementViews, countTonesMastered } from './achievements'
@@ -210,5 +210,8 @@ export function useEffectiveStreak(): EffectiveStreak {
     () => (api ? null : computeEffectiveStreak(p.state.xpByDay, localDay(), null)),
     [api, p.state.xpByDay],
   )
-  return api ? api.streak : fallback!
+  const s = api ? api.streak : fallback!
+  // Safety net for migrated saves without xpByDay history: never show less than the persisted streak.
+  const raw = displayStreak(p.state, localDay())
+  return raw > s.current ? { ...s, current: raw, best: Math.max(s.best, raw) } : s
 }
