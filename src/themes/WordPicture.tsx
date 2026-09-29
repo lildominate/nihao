@@ -7,7 +7,7 @@ export function WordPicture({ word, size = 64, className = '' }: { word: Pick<Wo
     <span className={`inline-flex shrink-0 items-center justify-center leading-none select-none ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.82 }} aria-hidden="true">
       {word.image
-        ? <img src={import.meta.env.BASE_URL + word.image} alt="" draggable={false} className="h-full w-full object-contain mix-blend-multiply dark:rounded-2xl dark:mix-blend-normal" />
+        ? <img src={import.meta.env.BASE_URL + word.image} alt="" draggable={false} className="h-full w-full object-contain" />
         : <span>{word.emoji ?? '❓'}</span>}
     </span>
   )

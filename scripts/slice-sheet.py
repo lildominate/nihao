@@ -10,11 +10,12 @@ from collections import deque
 from pathlib import Path
 from PIL import Image, ImageChops
 
-PAD = 14        # look slightly beyond each cell so objects overflowing the grid line stay whole
+PAD = 44        # look well beyond each cell: objects often overflow the grid line (neighbour fragments are filtered out)
 THRESH = 22     # "not white" threshold
 
 
-def isolate(cell: Image.Image) -> Image.Image:
+def isolate(cell: Image.Image, core: tuple[int, int, int, int]) -> Image.Image:
+    """`core` = the grid cell itself inside the padded crop; the object is the one centred there."""
     w, h = cell.size
     px = ImageChops.difference(cell, Image.new('RGB', cell.size, (255, 255, 255))).convert('L').load()
     lab = [[-1] * w for _ in range(h)]
@@ -32,15 +33,24 @@ def isolate(cell: Image.Image) -> Image.Image:
                         if 0 <= na < w and 0 <= nb < h and px[na, nb] > THRESH and lab[nb][na] < 0:
                             lab[nb][na] = k; q.append((na, nb))
                 comps.append((n, x0, y0, x1, y1))
-    main = max(range(len(comps)), key=lambda k: comps[k][0])
+    cx0, cy0, cx1, cy1 = core
+
+    def centred(k):
+        _, x0, y0, x1, y1 = comps[k]
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        return cx0 <= mx <= cx1 and cy0 <= my <= cy1
+
+    # The object is the biggest component CENTRED in this cell — not the biggest in the padded crop,
+    # which can be a neighbour that overflows its own cell.
+    main = max((k for k in range(len(comps)) if centred(k)), key=lambda k: comps[k][0])
     m = comps[main]
 
     def keep(k):
         n, x0, y0, x1, y1 = comps[k]
         if k == main:
             return True
-        if n <= 12 or x0 <= 2 or y0 <= 2 or x1 >= w - 3 or y1 >= h - 3:
-            return False  # specks, or fragments of a neighbour touching the crop edge
+        if n <= 12 or not centred(k):
+            return False  # specks, or pieces of neighbours
         return y0 <= m[4]  # details below the object belong to the next row (e.g. its steam)
 
     kept = {k for k in range(len(comps)) if keep(k)}
@@ -55,7 +65,39 @@ def isolate(cell: Image.Image) -> Image.Image:
     side = int(max(obj.size) * 1.12)
     sq = Image.new('RGB', (side, side), (255, 255, 255))
     sq.paste(obj, ((side - obj.width) // 2, (side - obj.height) // 2))
-    return sq.resize((256, 256), Image.LANCZOS)
+    return transparent_background(sq).resize((256, 256), Image.LANCZOS)
+
+
+def transparent_background(img: Image.Image) -> Image.Image:
+    """Make the white surroundings transparent (flood fill from the border), keeping white
+    INSIDE the object (baozi dough, milk). Near-white edge pixels get partial alpha for a soft edge."""
+    w, h = img.size
+    px = img.load()
+    def whiteness(p):  # 0 = clearly coloured … 255 = pure white
+        return min(p)
+    outside = [[False] * w for _ in range(h)]
+    q = deque((x, y) for x in range(w) for y in (0, h - 1)) + deque((x, y) for y in range(h) for x in (0, w - 1))
+    for x, y in q:
+        outside[y][x] = whiteness(px[x, y]) >= 226
+    q = deque((x, y) for x, y in q if outside[y][x])
+    while q:
+        x, y = q.popleft()
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < w and 0 <= ny < h and not outside[ny][nx] and whiteness(px[nx, ny]) >= 226:
+                outside[ny][nx] = True; q.append((nx, ny))
+    rgba = img.convert('RGBA'); rp = rgba.load()
+    for y in range(h):
+        for x in range(w):
+            if outside[y][x]:
+                rp[x, y] = (255, 255, 255, 0)
+            else:
+                # anti-alias: pixels bordering the outside that are nearly white fade out
+                near = any(0 <= x + dx < w and 0 <= y + dy < h and outside[y + dy][x + dx] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+                if near:
+                    r, g, b_, _ = rp[x, y]
+                    rp[x, y] = (r, g, b_, max(0, min(255, int((255 - min(r, g, b_)) * 4))))
+    return rgba
 
 
 def main():
@@ -67,9 +109,10 @@ def main():
         if wid == '-':
             continue
         r, c = divmod(i, cols)
-        box = (max(0, round(c * W / cols) - PAD), max(0, round(r * H / rows) - PAD),
-               min(W, round((c + 1) * W / cols) + PAD), min(H, round((r + 1) * H / rows) + PAD))
-        isolate(im.crop(box)).save(dest / f'{wid}.webp', 'WEBP', quality=82)
+        gx0, gy0, gx1, gy1 = round(c * W / cols), round(r * H / rows), round((c + 1) * W / cols), round((r + 1) * H / rows)
+        box = (max(0, gx0 - PAD), max(0, gy0 - PAD), min(W, gx1 + PAD), min(H, gy1 + PAD))
+        core = (gx0 - box[0], gy0 - box[1], gx1 - box[0], gy1 - box[1])
+        isolate(im.crop(box), core).save(dest / f'{wid}.webp', 'WEBP', quality=85)
     print(f'{sum(1 for i in ids if i != "-")} images -> {dest}')
 
 
