@@ -16,7 +16,7 @@ import { cellSize, drawSnakeScene, type SnakeView } from '../ui/snakeScene'
 import { useCanvasView } from '../ui/useCanvas'
 import { sentencesFor } from './Meningsbyggaren'
 
-type Phase = 'countdown' | 'ready' | 'play' | 'result' | 'crash' | 'over'
+type Phase = 'menu' | 'countdown' | 'ready' | 'go' | 'play' | 'result' | 'crash' | 'over'
 
 interface Live {
   phase: Phase
@@ -40,9 +40,25 @@ interface Live {
   playMs: number
   countShown: number
   crashed: boolean
+  /** 0..1 fade of the token layer. */
+  fade: number
+  calm: boolean
 }
 
 const COUNTDOWN_S = 3
+/** Freeze after an eat / crash so the player can read the feedback. */
+const BREATHER_S = 1.2
+/** "Redo… kör!" pulse (tokens fade in during the first part) before movement resumes. */
+const GO_S = 0.9
+const FADE_S = 0.45
+const CALM_KEY = 'nihao/snake-calm'
+
+function loadCalm(): boolean {
+  try { return localStorage.getItem(CALM_KEY) === '1' } catch { return false }
+}
+function saveCalm(v: boolean) {
+  try { localStorage.setItem(CALM_KEY, v ? '1' : '0') } catch { /* ignore */ }
+}
 
 export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd, onExit }: GameProps) {
   const [paused, setPaused] = usePause()
@@ -58,14 +74,18 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
   if (!live.current) {
     const snake = spawnSnake(SNAKE_START_LEN, SNAKE_COLS, 13)
     live.current = {
-      phase: 'countdown', t: COUNTDOWN_S, time: 0, acc: 0, snake, prev: snake.body, tokens: [], round: null, index: 0, rows: 13,
-      lives: SNAKE_LIVES, score: 0, combo: 0, bestCombo: 0, right: 0, reveal: null, wasCorrect: true, flash: 0, playMs: 0, countShown: 0, crashed: false,
+      phase: 'menu', t: COUNTDOWN_S, time: 0, acc: 0, snake, prev: snake.body, tokens: [], round: null, index: 0, rows: 13,
+      lives: SNAKE_LIVES, score: 0, combo: 0, bestCombo: 0, right: 0, reveal: null, wasCorrect: true, flash: 0, playMs: 0, countShown: 0, crashed: false, fade: 1, calm: loadCalm(),
     }
   }
 
   const [hud, setHud] = useState({ score: 0, lives: SNAKE_LIVES, n: 0, combo: 0 })
   const [prompt, setPrompt] = useState<RunnerItem | null>(null)
-  const [count, setCount] = useState<number | null>(COUNTDOWN_S)
+  const [count, setCount] = useState<number | null>(null)
+  const [calm, setCalm] = useState(() => live.current.calm)
+  const [menu, setMenu] = useState(true)
+  const [go, setGo] = useState(false)
+  const [ok, setOk] = useState<{ item: RunnerItem; x: number; y: number } | null>(null)
   const [reveal, setReveal] = useState<{ item: RunnerItem | null; crash?: 'wall' | 'self' } | null>(null)
   const [hint, setHint] = useState(false)
 
@@ -80,7 +100,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
   const view = useCanvasView(boardRef, canvasRef, (v) => {
     const L = live.current
     const rows = boardRows(v.w, v.h, SNAKE_COLS)
-    if (L.phase === 'countdown' && rows !== L.rows) {
+    if ((L.phase === 'countdown' || L.phase === 'menu') && rows !== L.rows) {
       L.rows = rows
       L.snake = spawnSnake(SNAKE_START_LEN, SNAKE_COLS, rows)
       L.prev = L.snake.body
@@ -124,6 +144,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
   const layTokens = (round: SnakeRound) => {
     const L = live.current
     L.tokens = placeTokens(round.options, round.target.key, L.snake, SNAKE_COLS, L.rows)
+    L.fade = reduced ? 1 : 0
   }
 
   const startRound = (index: number) => {
@@ -136,6 +157,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     if (!asked.current.some((a) => a.key === round.target.key)) asked.current.push(round.target)
     setPrompt(round.target)
     setReveal(null)
+    setOk(null)
     setHud((h) => ({ ...h, n: index + 1 }))
   }
 
@@ -145,6 +167,22 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     const ox = (v.w - cell * SNAKE_COLS) / 2
     const oy = (v.h - cell * live.current.rows) / 2
     return { x: ox + (t.x + t.w / 2) * cell, y: oy + (t.y + t.h / 2) * cell }
+  }
+  const headCentre = () => {
+    const v = view.current
+    const cell = cellSize({ w: v.w, h: v.h, cols: SNAKE_COLS, rows: live.current.rows })
+    const ox = (v.w - cell * SNAKE_COLS) / 2
+    const oy = (v.h - cell * live.current.rows) / 2
+    const h = live.current.snake.body[0]
+    return { x: ox + (h.x + 0.5) * cell, y: oy + (h.y + 0.5) * cell }
+  }
+  const beginGo = () => {
+    const L = live.current
+    L.phase = 'go'
+    L.t = GO_S
+    L.acc = 0
+    setOk(null)
+    setGo(true)
   }
   const boardOrigin = () => boardRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
 
@@ -168,7 +206,9 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
       celebrate('burst', { origin: { x: b.left + c.x, y: b.top + c.y }, intensity: 0.7 })
       floatText(layerRef.current, c.x, c.y - 10, `+${pts}`)
       setHud({ score: L.score, lives: L.lives, n: L.index + 1, combo: L.combo })
-      L.t = 0.55
+      L.t = BREATHER_S
+      const hc = headCentre()
+      setOk({ item: round.target, x: hc.x, y: hc.y })
     } else {
       L.combo = 0
       L.lives -= 1
@@ -183,7 +223,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
       if (stageRef.current) replay(stageRef.current, 'shake')
       setReveal({ item: round.target })
       setHud({ score: L.score, lives: L.lives, n: L.index + 1, combo: 0 })
-      L.t = 1.7
+      L.t = BREATHER_S + 0.5
     }
     L.phase = 'result'
   }
@@ -194,7 +234,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     L.combo = 0
     L.flash = 0.6
     L.phase = 'crash'
-    L.t = 1
+    L.t = BREATHER_S
     L.crashed = true
     playSfx('wrong')
     haptic('error')
@@ -209,11 +249,9 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     L.snake = spawnSnake(len, SNAKE_COLS, L.rows)
     L.prev = L.snake.body
     L.acc = 0
-    L.crashed = false
     if (L.round) layTokens(L.round)
-    L.phase = 'ready'
     setReveal(null)
-    setHint(true)
+    beginGo()
   }
 
   // ── main loop ──────────────────────────────────────────────
@@ -224,14 +262,17 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     L.playMs += dt
     if (L.flash > 0) L.flash = Math.max(0, L.flash - dtS)
 
-    if (L.phase === 'countdown') {
+    if (L.fade < 1) L.fade = Math.min(1, L.fade + dtS / FADE_S)
+    if (L.phase === 'menu') {
+      // waiting on the start card
+    } else if (L.phase === 'countdown') {
       L.t -= dtS
       const n = Math.max(0, Math.ceil(L.t))
       if (n !== L.countShown) { L.countShown = n; setCount(n > 0 ? n : null) }
       if (L.t <= 0) { startRound(0); L.phase = 'ready'; setHint(true) }
     } else if (L.phase === 'play') {
       L.acc += dt
-      const ms = tickMs(L.index)
+      const ms = tickMs(L.index, L.calm)
       if (L.acc >= ms) {
         L.acc -= ms
         const res = step(L.snake, L.tokens, SNAKE_COLS, L.rows)
@@ -247,11 +288,18 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
       if (L.t <= 0) {
         if (L.lives <= 0) finish(false)
         else if (L.index + 1 >= SNAKE_PROMPTS) finish(true)
-        else { startRound(L.index + 1); L.phase = 'play'; L.acc = 0 }
+        else { startRound(L.index + 1); beginGo() }
       }
     } else if (L.phase === 'crash') {
       L.t -= dtS
       if (L.t <= 0) { if (L.lives <= 0) finish(false); else respawn() }
+    } else if (L.phase === 'go') {
+      L.t -= dtS
+      if (L.t <= 0) {
+        setGo(false)
+        if (L.crashed) { L.phase = 'ready'; setHint(true) }
+        else { L.phase = 'play'; L.acc = 0 }
+      }
     }
     render()
   })
@@ -266,7 +314,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     const L = live.current
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     const v: SnakeView = { w, h, cols: SNAKE_COLS, rows: L.rows }
-    const alpha = L.phase === 'play' && !reduced ? Math.min(1, L.acc / tickMs(L.index)) : 1
+    const alpha = L.phase === 'play' && !reduced ? Math.min(1, L.acc / tickMs(L.index, L.calm)) : 1
     const r = L.reveal
     drawSnakeScene(ctx, v, pal, {
       time: L.time,
@@ -277,8 +325,9 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
       modeOf: (t) => !r ? 'normal' : t.id === r.good ? 'good' : t.id === r.bad ? 'bad' : 'dim',
       colored: toneColors,
       flash: L.flash,
-      blink: L.phase === 'crash' || (L.phase === 'ready' && L.crashed),
+      blink: L.phase === 'crash' || (L.crashed && (L.phase === 'ready' || L.phase === 'go')),
       pulse: !reduced,
+      tokenAlpha: L.fade,
     })
   }
 
@@ -290,10 +339,11 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
       if (d === opposite(L.snake.dir)) return
       L.snake = { ...L.snake, dir: d, queue: [] }
       L.phase = 'play'
-      L.acc = tickMs(L.index) * 0.6
+      L.crashed = false
+      L.acc = tickMs(L.index, L.calm) * 0.6
       setHint(false)
       haptic('select')
-    } else if (L.phase === 'play') {
+    } else if (L.phase === 'play' || (L.phase === 'go' && !L.crashed)) {
       const next = steer(L.snake, d)
       if (next !== L.snake) { L.snake = next; haptic('select') }
     }
@@ -311,6 +361,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
 
   const drag = useRef<{ id: number; x: number; y: number } | null>(null)
   const onDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY }
     try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* ignore */ }
   }
@@ -318,9 +369,26 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
     const d = drag.current
     if (!d || d.id !== e.pointerId) return
     const dir = swipeToDir(e.clientX - d.x, e.clientY - d.y)
+    // decide as soon as the threshold is passed, then restart from here so the next swipe needs no lift
     if (dir) { turn(dir); d.x = e.clientX; d.y = e.clientY }
   }
   const onUp = () => { drag.current = null }
+
+  const startGame = () => {
+    const L = live.current
+    if (L.phase !== 'menu') return
+    L.phase = 'countdown'
+    L.t = COUNTDOWN_S
+    L.countShown = 0
+    setMenu(false)
+    setCount(COUNTDOWN_S)
+  }
+  const toggleCalm = () => {
+    const v = !calm
+    live.current.calm = v
+    setCalm(v)
+    saveCalm(v)
+  }
 
   const hudNode = (
     <div className="flex items-center justify-between gap-2">
@@ -336,16 +404,17 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
 
   const padBtn = (d: Dir, label: string, path: string, cls: string) => (
     <button type="button" aria-label={label} data-testid={`snake-pad-${d}`}
-      onPointerDown={(e) => { e.preventDefault(); turn(d) }}
-      className={`press flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-b-4 border-line bg-surface text-ink active:border-b-2 ${cls}`}>
-      <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
+      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); turn(d) }}
+      className={`press flex h-[72px] w-[72px] items-center justify-center rounded-2xl border-2 border-b-4 border-line bg-surface text-ink active:border-b-2 ${cls}`}>
+      <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
     </button>
   )
 
   return (
     <GameFrame title="Pānpan Snake" paused={paused} setPaused={setPaused} reduced={reduced} hud={hudNode}
       onExit={() => { seq.current.cancel(); stopSpeaking(); onExit(tracker.current.answered ? tracker.current.result(live.current.playMs) : null) }}>
-      <div className="flex h-full flex-col">
+      <div className="flex h-full touch-none select-none flex-col" data-testid="snake-screen"
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
         <div className="px-3 pt-1">
           <div key={(prompt?.key ?? '') + hud.n} className="g-in rounded-2xl bg-surface-2 px-4 py-2 text-center" data-testid="snake-prompt">
             <div className="text-[11px] font-extrabold uppercase tracking-wider text-ink-muted">Ät rätt pinyin för</div>
@@ -353,8 +422,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
           </div>
         </div>
 
-        <div ref={stageRef} className="relative min-h-0 flex-1 touch-none overflow-hidden px-1 py-1" data-testid="snake-stage"
-          onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+        <div ref={stageRef} className="relative min-h-0 flex-1 touch-none overflow-hidden px-1 py-1" data-testid="snake-stage">
           <div ref={boardRef} className="relative h-full w-full">
             <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
             <div ref={layerRef} className="pointer-events-none absolute inset-0" />
@@ -364,6 +432,7 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
                   <>
                     <div className="text-xs font-extrabold uppercase tracking-wider opacity-90">Rätt svar:</div>
                     <PinyinText pinyin={reveal.item.pinyin} colored={false} className="text-xl font-black" />
+                    <div className="text-xs font-bold opacity-90">{reveal.item.sv}</div>
                   </>
                 ) : (
                   <div className="text-base font-black">{reveal.crash === 'wall' ? 'Aj! Du krockade med väggen' : 'Aj! Du åt dig själv'} – ett liv förlorat</div>
@@ -375,6 +444,35 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
                 <span className="rounded-full bg-ink/80 px-4 py-1.5 text-sm font-black text-surface">Svep eller tryck en pil för att köra</span>
               </div>
             )}
+            {ok && (
+              <div className="g-pop pointer-events-none absolute z-10 -translate-x-1/2 rounded-2xl bg-brand px-3 py-1.5 text-center text-white shadow-lg" data-testid="snake-ok"
+                style={{ left: Math.min(Math.max(ok.x, 90), Math.max(90, view.current.w - 90)), top: ok.y > 90 ? ok.y - 74 : ok.y + 30 }}>
+                <div className="text-sm font-black leading-tight">✓ <PinyinText pinyin={ok.item.pinyin} colored={false} className="text-lg font-black" /></div>
+                <div className="text-xs font-bold leading-tight opacity-95">{ok.item.sv}</div>
+              </div>
+            )}
+            {go && (
+              <div className="pointer-events-none absolute inset-x-0 top-1/2 flex justify-center" data-testid="snake-go">
+                <span className="g-pop rounded-full bg-ink/85 px-5 py-2 text-xl font-black text-surface">Redo… kör!</span>
+              </div>
+            )}
+            {menu && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center p-4" data-testid="snake-menu">
+                <div className="w-full max-w-xs rounded-3xl bg-surface p-4 text-center shadow-xl ring-2 ring-line">
+                  <div className="text-lg font-black">Redo?</div>
+                  <p className="mt-1 text-sm text-ink-muted">Svep var som helst på skärmen eller använd pilarna.</p>
+                  <button type="button" role="switch" aria-checked={calm} data-testid="snake-calm" onClick={toggleCalm}
+                    className="press mt-3 flex w-full items-center justify-between rounded-2xl border-2 border-line px-4 py-3 text-left">
+                    <span><span className="block text-base font-black">Lugnt läge</span><span className="block text-xs text-ink-muted">Ingen ökande fart</span></span>
+                    <span className={`flex h-7 w-12 items-center rounded-full p-0.5 transition-colors ${calm ? 'bg-brand' : 'bg-surface-2'}`}>
+                      <span className={`h-6 w-6 rounded-full bg-white shadow transition-transform ${calm ? 'translate-x-5' : ''}`} />
+                    </span>
+                  </button>
+                  <button type="button" data-testid="snake-start" onClick={startGame}
+                    className="press mt-3 w-full rounded-2xl bg-brand px-4 py-3 text-lg font-black text-white">Starta</button>
+                </div>
+              </div>
+            )}
             {count !== null && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <span key={count} className="g-pop text-8xl font-black text-ink drop-shadow-[0_4px_0_rgba(255,255,255,.7)]" data-testid="snake-count">{count}</span>
@@ -383,8 +481,8 @@ export function PanpanSnake({ words, weights, extra, reduced, toneColors, onEnd,
           </div>
         </div>
 
-        <div className="flex justify-center pt-1 pb-3">
-          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="Riktningar">
+        <div className="flex justify-center pt-1 pb-4">
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Riktningar">
             <span />{padBtn('up', 'Upp', 'M6 15l6-6 6 6', 'col-start-2')}<span />
             {padBtn('left', 'Vänster', 'M15 6l-6 6 6 6', '')}
             {padBtn('down', 'Ner', 'M6 9l6 6 6-6', '')}

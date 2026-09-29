@@ -18,7 +18,11 @@ export const SNAKE_RESPAWN_MAX = 8
 export const SNAKE_FOUR_FROM = 6
 /** Prompt index from which short phrases are mixed in. */
 export const SNAKE_PHRASE_FROM = 8
-export const SNAKE_SWIPE_THRESHOLD = 22
+export const SNAKE_SWIPE_THRESHOLD = 18
+/** Fresh tokens spawn at least this many cells (Manhattan) from the head. */
+export const SNAKE_SPAWN_MIN_DIST = 4
+export const SNAKE_BASE_MS = 420
+export const SNAKE_MIN_MS = 240
 
 export const snakePoints = runnerPoints
 export const snakeFinalBonus = runnerFinalBonus
@@ -30,9 +34,10 @@ export function optionCount(index: number, phrase = false): 3 | 4 {
   return index >= SNAKE_FOUR_FROM && !phrase ? 4 : 3
 }
 
-/** Milliseconds per grid step: starts slow (330) and gets gradually faster (170 at the end). */
-export function tickMs(index: number): number {
-  return Math.max(170, Math.round(330 - index * 11.5))
+/** Milliseconds per grid step: starts slow (420) and ramps gently (240 at the end). Calm mode never ramps. */
+export function tickMs(index: number, calm = false): number {
+  if (calm) return SNAKE_BASE_MS
+  return Math.max(SNAKE_MIN_MS, Math.round(SNAKE_BASE_MS - index * 12.9))
 }
 
 /** Rows that fit a canvas of `w`×`h` at `cols` columns. */
@@ -151,7 +156,13 @@ const hitsCell = (r: Rect, c: Cell, m: number) => c.x >= r.x - m && c.x < r.x + 
 export function placeTokens(items: readonly RunnerItem[], targetKey: string, snake: Snake, cols: number, rows: number, rng: Rng = Math.random): Token[] {
   const head = snake.body[0]
   const v = DIR_VEC[snake.dir]
-  const ahead: Cell[] = [1, 2, 3].map((i) => ({ x: head.x + v.x * i, y: head.y + v.y * i }))
+  // the whole straight path ahead of the head, up to the wall
+  const ahead: Cell[] = []
+  for (let i = 1; i < Math.max(cols, rows); i++) {
+    const c = { x: head.x + v.x * i, y: head.y + v.y * i }
+    if (c.x < 0 || c.y < 0 || c.x >= cols || c.y >= rows) break
+    ahead.push(c)
+  }
   const out: Token[] = []
   // biggest first: they are the hardest to place
   const order = [...items].sort((a, b) => tokenSize(b).w * tokenSize(b).h - tokenSize(a).w * tokenSize(a).h)
@@ -171,30 +182,39 @@ export function placeTokens(items: readonly RunnerItem[], targetKey: string, sna
         if (r.x + w > cols || r.y + h > rows) continue
         if (out.some((o) => overlaps(r, o, gap))) continue
         if (snake.body.some((c) => hitsCell(r, c, snakeMargin))) continue
+        if (rectDistance(r, head) < SNAKE_SPAWN_MIN_DIST) continue
         if (level < 2 && ahead.some((c) => hitsCell(r, c, 0))) continue
         placed = r
       }
       if (placed) break
     }
-    if (!placed) placed = scanFree({ w, h }, out, snake.body, cols, rows)
+    if (!placed) placed = scanFree({ w, h }, out, snake.body, cols, rows, head)
     out.push({ id: item.key, item, correct: item.key === targetKey, ...placed })
   }
   return items.map((it) => out.find((t) => t.id === it.key)!)
 }
 
-function scanFree(size: { w: number; h: number }, others: readonly Rect[], body: readonly Cell[], cols: number, rows: number): Rect {
-  let best: Rect = { x: 0, y: 0, ...size }
-  for (let y = 0; y + size.h <= rows; y++) {
-    for (let x = 0; x + size.w <= cols; x++) {
-      const r = { x, y, ...size }
-      if (others.some((o) => overlaps(r, o, 0))) continue
-      if (body.some((c) => hitsCell(r, c, 0))) continue
-      return r
+/** Manhattan distance from a cell to the nearest cell of a rectangle. */
+export function rectDistance(r: Rect, c: Cell): number {
+  const dx = Math.max(r.x - c.x, 0, c.x - (r.x + r.w - 1))
+  const dy = Math.max(r.y - c.y, 0, c.y - (r.y + r.h - 1))
+  return dx + dy
+}
+
+function scanFree(size: { w: number; h: number }, others: readonly Rect[], body: readonly Cell[], cols: number, rows: number, head: Cell): Rect {
+  for (const minDist of [SNAKE_SPAWN_MIN_DIST, 2, 0]) {
+    for (let y = 0; y + size.h <= rows; y++) {
+      for (let x = 0; x + size.w <= cols; x++) {
+        const r = { x, y, ...size }
+        if (others.some((o) => overlaps(r, o, 0))) continue
+        if (body.some((c) => hitsCell(r, c, 0))) continue
+        if (rectDistance(r, head) < minDist) continue
+        return r
+      }
     }
   }
   // truly nowhere: stack at the top-left
-  best = { x: 0, y: 0, ...size }
-  return best
+  return { x: 0, y: 0, ...size }
 }
 
 // ─── Prompts ─────────────────────────────────────────────────

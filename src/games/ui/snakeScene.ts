@@ -28,6 +28,8 @@ export interface SnakeScene {
   /** blink the snake (crash / respawn wait). */
   blink: boolean
   pulse: boolean
+  /** 0..1 fade of the token layer (fade-in of a new prompt). Default 1. */
+  tokenAlpha?: number
 }
 
 export const cellSize = (v: SnakeView) => Math.min(v.w / v.cols, v.h / v.rows)
@@ -103,7 +105,9 @@ export function drawSnakeScene(ctx: CanvasRenderingContext2D, v: SnakeView, pal:
   ctx.restore()
 
   // tokens
+  ctx.globalAlpha = st.tokenAlpha ?? 1
   for (const t of st.tokens) drawToken(ctx, t, cell, pal, st)
+  ctx.globalAlpha = 1
 
   // snake
   drawSnake(ctx, st, cell, pal)
@@ -138,7 +142,7 @@ function drawToken(ctx: CanvasRenderingContext2D, t: Token, cell: number, pal: P
   const bob = st.pulse && mode === 'normal' ? Math.sin(st.time * 3 + t.x * 0.7 + t.y) * cell * 0.03 : 0
   ctx.save()
   ctx.translate(0, bob)
-  if (mode === 'dim') ctx.globalAlpha = 0.45
+  if (mode === 'dim') ctx.globalAlpha *= 0.45
   // shadow
   ctx.fillStyle = 'rgba(0,0,0,.14)'
   rr(ctx, x, y + cell * 0.1, w, h, cell * 0.32); ctx.fill()

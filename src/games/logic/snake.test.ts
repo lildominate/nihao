@@ -4,7 +4,7 @@ import { buildWordPool } from './pool'
 import { seeded } from './random'
 import { playableSentences } from './builder'
 import {
-  boardRows, optionCount, placeTokens, SnakeDeck, spawnSnake, step, steer, swipeToDir, tickMs, tokenAt, tokenCells, tokenSize,
+  boardRows, optionCount, placeTokens, rectDistance, DIR_VEC, SNAKE_SPAWN_MIN_DIST, SNAKE_SWIPE_THRESHOLD, SnakeDeck, spawnSnake, step, steer, swipeToDir, tickMs, tokenAt, tokenCells, tokenSize,
   SNAKE_COLS, SNAKE_MIN_LEN, type Snake, type Token,
 } from './snake'
 import { wordItem } from './runner'
@@ -16,10 +16,14 @@ const snakeAt = (cells: [number, number][], dir: Snake['dir'] = 'right'): Snake 
 
 describe('difficulty curve', () => {
   it('gets faster and stays above the floor', () => {
-    expect(tickMs(0)).toBe(330)
+    expect(tickMs(0)).toBe(420)
     expect(tickMs(5)).toBeLessThan(tickMs(0))
     expect(tickMs(14)).toBeLessThan(tickMs(7))
-    expect(tickMs(99)).toBe(170)
+    expect(tickMs(14)).toBeGreaterThanOrEqual(240)
+    expect(tickMs(99)).toBe(240)
+  })
+  it('calm mode never ramps', () => {
+    for (const i of [0, 7, 14, 99]) expect(tickMs(i, true)).toBe(420)
   })
   it('3 options first, 4 later, phrases stay at 3', () => {
     expect(optionCount(0)).toBe(3)
@@ -35,7 +39,11 @@ describe('difficulty curve', () => {
 
 describe('input', () => {
   it('swipes need distance and pick the dominant axis', () => {
+    expect(SNAKE_SWIPE_THRESHOLD).toBe(18)
     expect(swipeToDir(5, 5)).toBeNull()
+    expect(swipeToDir(17, 3)).toBeNull()
+    expect(swipeToDir(18, 3)).toBe('right')
+    expect(swipeToDir(-2, -19)).toBe('up')
     expect(swipeToDir(-40, 10)).toBe('left')
     expect(swipeToDir(10, -40)).toBe('up')
     expect(swipeToDir(10, 40)).toBe('down')
@@ -121,6 +129,30 @@ describe('spawn and tokens', () => {
       }
       expect(tokenAt(tokens, { x: tokens[0].x, y: tokens[0].y })).toBe(tokens[0])
     }
+  })
+  it('spawns at least 4 cells from the head and never on the straight path ahead', () => {
+    for (let seed = 0; seed < 120; seed++) {
+      const rng = seeded(seed + 1000)
+      const rows = 9 + (seed % 7)
+      const snake = spawnSnake(3 + (seed % 6), SNAKE_COLS, rows)
+      // also try other headings from a mid-board snake
+      const dirs = ['up', 'down', 'left', 'right'] as const
+      const dir = dirs[seed % 4]
+      const s2 = seed % 2 ? snake : { body: [{ x: 5, y: 5 }, { x: 5 - DIR_VEC[dir].x, y: 5 - DIR_VEC[dir].y }], dir, queue: [] }
+      const its = items(seed % 3 ? 4 : 3)
+      const tokens = placeTokens(its, its[0].key, s2, SNAKE_COLS, rows, rng)
+      const head = s2.body[0]
+      const v = DIR_VEC[s2.dir]
+      for (const t of tokens) {
+        expect(rectDistance(t, head)).toBeGreaterThanOrEqual(SNAKE_SPAWN_MIN_DIST)
+        for (let i = 1; i < 20; i++) expect(tokenAt([t], { x: head.x + v.x * i, y: head.y + v.y * i })).toBeUndefined()
+      }
+    }
+  })
+  it('rectDistance is Manhattan to the nearest cell', () => {
+    expect(rectDistance({ x: 5, y: 5, w: 3, h: 1 }, { x: 5, y: 5 })).toBe(0)
+    expect(rectDistance({ x: 5, y: 5, w: 3, h: 1 }, { x: 2, y: 3 })).toBe(5)
+    expect(rectDistance({ x: 5, y: 5, w: 3, h: 1 }, { x: 9, y: 5 })).toBe(2)
   })
   it('sizes tokens by text length and kind', () => {
     expect(tokenSize({ ...wordItem(pool.words[0]), pinyin: 'nǐ' })).toEqual({ w: 3, h: 1 })
