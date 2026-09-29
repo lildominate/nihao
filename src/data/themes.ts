@@ -24,6 +24,18 @@ export const THEME_NEW_WORDS: NewWord[] = [
   ['bao-zi', '包子', 'bāo zi', 'baozi/fylld bulle', '🥟'],
   ['man-tou', '馒头', 'mán tou', 'mantou/ångat bröd', '🍞'],
   ['dou-fu', '豆腐', 'dòu fu', 'tofu', '🧈'],
+  // home: added with the illustrated home sheet
+  ['zhuo-zi', '桌子', 'zhuō zi', 'bord', '🍽️'],
+  ['bing-xiang', '冰箱', 'bīng xiāng', 'kylskåp', '🧊'],
+  ['bei-zi', '杯子', 'bēi zi', 'kopp/mugg/glas', '🍵'],
+  ['shao-zi', '勺子', 'sháo zi', 'sked', '🥄'],
+  ['kuai-zi', '筷子', 'kuài zi', 'ätpinnar/pinnar', '🥢'],
+  ['guo-wok', '锅', 'guō', 'wok/kastrull/gryta', '🍳'],
+  ['dian-fan-guo', '电饭锅', 'diàn fàn guō', 'riskokare', '🍚'],
+  ['shi-zhong', '时钟', 'shí zhōng', 'klocka/väggklocka', '🕰️'],
+  ['zhen-tou', '枕头', 'zhěn tou', 'kudde', '💤'],
+  ['shui-hu', '水壶', 'shuǐ hú', 'vattenkokare/kanna', '🫖'],
+  ['ya-shua', '牙刷', 'yá shuā', 'tandborste', '🪥'],
   // vehicles
   ['qi-che', '汽车', 'qì chē', 'bil', '🚗'],
   ['zi-xing-che', '自行车', 'zì xíng chē', 'cykel', '🚲'],
@@ -116,6 +128,7 @@ export const themes: Theme[] = [
     words: [
       'fang-zi', 'men-door', 'chuang-hu', 'chuang-bed', 'yi-zi', 'sha-fa', 'deng-lamp', 'dian-shi', 'shou-ji', 'dian-nao',
       'shu', 'pan-zi', 'xie-zi', 'yao-shi', 'yu-san', 'jing-zi', 'ma-tong', 'yu-gang',
+      'zhuo-zi', 'bei-zi', 'kuai-zi', 'shao-zi', 'bing-xiang', 'guo-wok', 'dian-fan-guo', 'shi-zhong', 'zhen-tou', 'shui-hu', 'ya-shua',
     ],
   },
 ]
@@ -125,7 +138,10 @@ export const themes: Theme[] = [
 export const THEME_IMAGES: Record<string, string> = Object.fromEntries(
   ['yu', 'xia-shrimp', 'ji-rou', 'niu-rou', 'zhu-rou', 'ji-dan', 'mi-fan', 'mian-tiao', 'jiao-zi', 'bao-zi', 'man-tou', 'tang-soup', 'mian-bao', 'ping-guo',
     'xiang-jiao', 'cheng-zi', 'xi-gua', 'tu-dou', 'xi-hong-shi', 'huang-gua', 'hu-luo-bo', 'dou-fu', 'shui', 'cha', 'niu-nai', 'ka-fei', 'guo-zhi', 'qi-shui']
-    .map((id) => [id, `pics/food/${id}.webp`]),
+    .map((id) => [id, `pics/food/${id}.webp`])
+    .concat(['fang-zi', 'men-door', 'chuang-hu', 'zhuo-zi', 'yi-zi', 'chuang-bed', 'sha-fa', 'deng-lamp', 'dian-shi', 'shou-ji', 'dian-nao', 'bing-xiang',
+      'bei-zi', 'pan-zi', 'shao-zi', 'kuai-zi', 'guo-wok', 'dian-fan-guo', 'shu', 'xie-zi', 'shi-zhong', 'zhen-tou', 'shui-hu', 'ya-shua']
+      .map((id) => [id, `pics/home/${id}.webp`])),
 )
 
 export function applyThemes(base: Course): Course {
