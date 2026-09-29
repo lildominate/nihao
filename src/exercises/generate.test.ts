@@ -402,7 +402,7 @@ describe('real course (v2 content) × adaptive generator', () => {
       done.push(l.id)
     })
     if (Object.keys(real.dialogues ?? {}).length) expect(dialogueReplies).toBeGreaterThan(0)
-  })
+  }, 30_000) // runs the adaptive generator over every lesson of the whole course
 })
 
 describe('multi-voice hints', () => {
