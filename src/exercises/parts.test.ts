@@ -41,5 +41,5 @@ describe('short lesson parts', () => {
         known.push(...p.newWords)
       }
     }
-  })
+  }, 30_000) // generates every lesson part of the whole (growing) course
 })
