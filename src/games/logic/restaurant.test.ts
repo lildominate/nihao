@@ -3,7 +3,7 @@ import { course } from '../../data/course'
 import { MENU, NO_SPICY_ID, resolveMenu } from './menu'
 import { seeded } from './random'
 import {
-  counterFor, finalBonus, generateOrder, gridSize, kindsFor, levelFor, patienceMs, pinyinVisible, tipFor, trayMatches, CUSTOMERS,
+  counterFor, finalBonus, lunchClock, speciesFor, generateOrder, gridSize, kindsFor, levelFor, patienceMs, pinyinVisible, tipFor, trayMatches, CUSTOMERS,
 } from './restaurant'
 
 const menu = resolveMenu(new Map(Object.entries(course.words)))
@@ -104,5 +104,15 @@ describe('scoring', () => {
   it('final bonus only for completed rounds', () => {
     expect(finalBonus(3, true)).toBe(75)
     expect(finalBonus(3, false)).toBe(0)
+  })
+})
+
+describe('scene helpers', () => {
+  it('cycles species and runs the clock 11:00-14:00', () => {
+    expect([0, 1, 2, 3, 4].map(speciesFor)).toEqual(['fox', 'rabbit', 'cat', 'duck', 'fox'])
+    expect(lunchClock(0).label).toBe('11:00')
+    expect(lunchClock(CUSTOMERS).label).toBe('14:00')
+    expect(lunchClock(4).label).toBe('12:30')
+    expect(lunchClock(99).label).toBe('14:00')
   })
 })

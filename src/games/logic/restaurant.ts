@@ -162,3 +162,20 @@ export function finalBonus(stars: number, completed: boolean): number {
 export function patienceMood(frac: number): 'happy' | 'ok' | 'angry' {
   return frac > 0.55 ? 'happy' : frac > 0.25 ? 'ok' : 'angry'
 }
+
+/** The four customer species, cycled in order so a shift always shows a mix. */
+export const SPECIES = ['fox', 'rabbit', 'cat', 'duck'] as const
+export type Species = (typeof SPECIES)[number]
+
+export function speciesFor(index: number): Species {
+  return SPECIES[((Math.floor(index) % SPECIES.length) + SPECIES.length) % SPECIES.length]
+}
+
+/** "Lunch rush" clock: the shift runs 11:00 -> 14:00; `done` = customers dealt with so far. */
+export function lunchClock(done: number): { label: string; hourDeg: number; minuteDeg: number } {
+  const p = Math.max(0, Math.min(1, done / CUSTOMERS))
+  const total = Math.round(p * 180)
+  const h = 11 + Math.floor(total / 60)
+  const m = total % 60
+  return { label: `${h}:${String(m).padStart(2, '0')}`, hourDeg: ((h % 12) + m / 60) * 30, minuteDeg: (total / 60) * 360 }
+}
