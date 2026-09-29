@@ -197,8 +197,8 @@ export function GamesHub() {
 
   if (active) {
     return <GameSession def={active.def} words={active.words} onRecords={setRecords} onClose={() => setActive(null)} />
-  if (themeGame) return <THEME_GAME_ENTRY.Component onExit={() => setThemeGame(false)} />
   }
+  if (themeGame) return <THEME_GAME_ENTRY.Component onExit={() => setThemeGame(false)} />
 
   return (
     <div className={`px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-6 ${reduced ? 'g-reduced' : ''}`}>

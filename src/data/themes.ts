@@ -18,6 +18,12 @@ export const THEME_NEW_WORDS: NewWord[] = [
   ['hu-luo-bo', '胡萝卜', 'hú luó bo', 'morot', '🥕'],
   ['qi-shui', '汽水', 'qì shuǐ', 'läsk/kolsyrad dryck', '🥤'],
   ['dan-gao', '蛋糕', 'dàn gāo', 'tårta/kaka', '🍰'],
+  // added with the illustrated food sheet (no good emoji, so they rely on the picture)
+  ['niu-rou', '牛肉', 'niú ròu', 'nötkött/biff', '🥩'],
+  ['zhu-rou', '猪肉', 'zhū ròu', 'fläskkött/fläsk', '🥓'],
+  ['bao-zi', '包子', 'bāo zi', 'baozi/fylld bulle', '🥟'],
+  ['man-tou', '馒头', 'mán tou', 'mantou/ångat bröd', '🍞'],
+  ['dou-fu', '豆腐', 'dòu fu', 'tofu', '🧈'],
   // vehicles
   ['qi-che', '汽车', 'qì chē', 'bil', '🚗'],
   ['zi-xing-che', '自行车', 'zì xíng chē', 'cykel', '🚲'],
@@ -82,6 +88,7 @@ export const themes: Theme[] = [
       'shui', 'cha', 'niu-nai', 'ka-fei', 'ping-guo', 'xiang-jiao', 'mi-fan', 'mian-bao', 'ji-dan', 'mian-tiao',
       'jiao-zi', 'tang-soup', 'yu', 'guo-zhi', 'xi-gua', 'cheng-zi', 'tu-dou', 'xi-hong-shi', 'huang-gua', 'hu-luo-bo',
       'xia-shrimp', 'ji-rou', 'qi-shui', 'dan-gao', 'shou-si', 'pi-jiu',
+      'niu-rou', 'zhu-rou', 'bao-zi', 'man-tou', 'dou-fu',
     ],
   },
   {
@@ -114,6 +121,13 @@ export const themes: Theme[] = [
 ]
 
 /** Wires themes into a built course: adds new words, sets emoji on theme words. Throws on id clashes. */
+/** Illustrations (public/pics/…) — Grok-drawn food sheet, sliced by the lead. Shown instead of the emoji. */
+export const THEME_IMAGES: Record<string, string> = Object.fromEntries(
+  ['yu', 'xia-shrimp', 'ji-rou', 'niu-rou', 'zhu-rou', 'ji-dan', 'mi-fan', 'mian-tiao', 'jiao-zi', 'bao-zi', 'man-tou', 'tang-soup', 'mian-bao', 'ping-guo',
+    'xiang-jiao', 'cheng-zi', 'xi-gua', 'tu-dou', 'xi-hong-shi', 'huang-gua', 'hu-luo-bo', 'dou-fu', 'shui', 'cha', 'niu-nai', 'ka-fei', 'guo-zhi', 'qi-shui']
+    .map((id) => [id, `pics/food/${id}.webp`]),
+)
+
 export function applyThemes(base: Course): Course {
   const words: Record<string, Word> = { ...base.words }
   for (const [id, hanzi, pinyin, svRaw, emoji] of THEME_NEW_WORDS) {
@@ -126,6 +140,10 @@ export function applyThemes(base: Course): Course {
   for (const [id, emoji] of Object.entries(THEME_EMOJI_FOR_EXISTING)) {
     if (!words[id]) throw new Error(`theme emoji for unknown word "${id}"`)
     words[id] = { ...words[id], emoji }
+  }
+  for (const [id, image] of Object.entries(THEME_IMAGES)) {
+    if (!words[id]) throw new Error(`theme image for unknown word "${id}"`)
+    words[id] = { ...words[id], image }
   }
   return { ...base, words, themes }
 }

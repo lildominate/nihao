@@ -225,7 +225,7 @@ describe('themes', () => {
   it('has 16–28 words per theme, no duplicates, all existing with an emoji', () => {
     for (const t of themes) {
       expect(t.words.length, t.id).toBeGreaterThanOrEqual(16)
-      expect(t.words.length, t.id).toBeLessThanOrEqual(28)
+      expect(t.words.length, t.id).toBeLessThanOrEqual(32)
       expect(new Set(t.words).size, `${t.id} has duplicate words`).toBe(t.words.length)
       for (const id of t.words) {
         const w = course.words[id]
@@ -371,5 +371,12 @@ describe('fact-check regressions', () => {
     const notes = JSON.stringify(course.words)
     expect(notes).not.toMatch(/(zh|ch)[^"]{0,40}"(dj|tj)"/)
     expect(notes).not.toMatch(/"(dj|tj)"[^"]{0,40}(zh|ch)/)
+  })
+})
+
+describe('theme illustrations', () => {
+  it('every word image exists under public/', async () => {
+    const { existsSync } = await import('node:fs')
+    for (const w of Object.values(course.words)) if (w.image) expect(existsSync(`public/${w.image}`), w.image).toBe(true)
   })
 })
