@@ -39,6 +39,7 @@ export const u06: UnitSpec = {
         ['ke-quarter', '刻', 'kè', 'kvart', 'measure'],
         ['shi-hou', '时候', 'shí hou', 'tid/tidpunkt', 'noun', 'Shén me shí hou = när.'],
         ['deng-yi-xia', '等一下', 'děng yī xià', 'vänta lite/ett ögonblick', 'phrase', 'Ordagrant "vänta en gång". yī uttalas yí före fjärdetonen xià: "děng yí xià".'],
+        ['zhong-min', '钟', 'zhōng', 'minut (i fēn zhōng)/klocka', 'noun', 'Fēn zhōng = minuter: shí fēn zhōng = tio minuter. Ordagrant "minut-klocka".'],
       ],
       sentences: [
         ['xian-zai ji-how-many dian-oclock ?', 'vad är klockan/hur mycket är klockan'],
@@ -103,6 +104,7 @@ export const u06: UnitSpec = {
         ['mei-tian', '每天', 'měi tiān', 'varje dag', 'noun'],
         ['yi-qi', '一起', 'yī qǐ', 'tillsammans', 'adv'],
         ['shi-jian', '时间', 'shí jiān', 'tid', 'noun'],
+        ['da-gai', '大概', 'dà gài', 'ungefär/cirka/nog', 'adv', 'Står före siffran eller verbet: dà gài shí fēn zhōng = ungefär tio minuter.'],
       ],
       sentences: [
         ['zhou-mo ni xiang-want zuo-do shen-me ?', 'vad vill du göra i helgen'],
@@ -112,6 +114,7 @@ export const u06: UnitSpec = {
         ['wo mei-tian he-drink cha', 'jag dricker te varje dag'],
         ['ni you-have shi-jian ma-q ?', 'har du tid'],
         ['ni xiang-want qu-go he-lan ma-q ?', 'vill du åka till Nederländerna/vill du åka till Holland'],
+        ['wo da-gai ming-tian lai-come', 'jag kommer nog imorgon/jag kommer ungefär imorgon/jag kommer förmodligen imorgon'],
       ],
       tip: 'Xiǎng = "skulle vilja" (mjukt), yào = "vill/ska" (bestämt). Qù betyder gå eller åka dit – platsen kommer direkt efter: qù Zhōng guó = åka till Kina.',
     },

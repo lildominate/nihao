@@ -183,6 +183,7 @@ describe('pinyin & hanzi', () => {
     'u13-l5-s6', // 导游说英文: pinyin-pro segments 游说 as yóu shuì (lobby); here 说 is shuō (导游 + 说 + 英文)
     '空:kòng', // 有空 (have free time): pinyin-pro reads 空 as kōng (empty); here it is kòng (free time)
     'u2-l4-s2', // 一点中文: pinyin-pro reads 点中 as "diǎn zhòng" (hit); correct is Zhōng wén
+    '得:děi', // 我得走了 (I have to go): pinyin-pro reads standalone 得 as dé/de; here it is děi (must)
   ])
 
   it('agrees with pinyin-pro (tones included)', () => {
