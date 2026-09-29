@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { course } from '../../data/course'
-import { MENU, NO_SPICY_ID, resolveMenu } from './menu'
+import { MENU, NO_MEAT_ID, NO_SPICY_ID, WISH_IDS, resolveMenu } from './menu'
 import { seeded } from './random'
 import {
-  counterFor, finalBonus, lunchClock, speciesFor, generateOrder, gridSize, kindsFor, levelFor, patienceMs, pinyinVisible, tipFor, trayMatches, CUSTOMERS,
+  counterFor, finalBonus, levelOrders, lunchClock, speciesFor, gridSize, LEVELS, patienceMs, pinyinVisible, tipFor, trayMatches, CUSTOMERS,
 } from './restaurant'
 
 const menu = resolveMenu(new Map(Object.entries(course.words)))
+const byId = new Map(menu.map((m) => [m.id, m]))
 
 describe('menu', () => {
   it('has 20-30 unique items with tone-marked pinyin and no written sandhi', () => {
@@ -27,13 +28,10 @@ describe('menu', () => {
 })
 
 describe('difficulty', () => {
-  it('levels ramp 1..4 across 8 customers', () => {
-    expect(Array.from({ length: CUSTOMERS }, (_, i) => levelFor(i))).toEqual([1, 1, 2, 2, 3, 3, 4, 4])
-  })
   it('patience shortens with level, lengthens with order size', () => {
-    expect(patienceMs(4, 1)).toBeLessThan(patienceMs(1, 1))
+    expect(patienceMs(5, 1)).toBeLessThan(patienceMs(1, 1))
     expect(patienceMs(2, 3)).toBeGreaterThan(patienceMs(2, 1))
-    expect(patienceMs(4, 1)).toBeGreaterThanOrEqual(9000)
+    expect(patienceMs(5, 1)).toBeGreaterThanOrEqual(9000)
   })
   it('pinyin is free on levels 1-2 and needs a tap after', () => {
     expect(pinyinVisible(2, false)).toBe(true)
@@ -42,33 +40,74 @@ describe('difficulty', () => {
   })
 })
 
-describe('order generation', () => {
-  it('level 1 is always one dish', () => {
-    const rng = seeded(1)
-    for (let i = 0; i < 40; i++) {
-      const o = generateOrder(menu, 0, rng)
-      expect(o.tray).toHaveLength(1)
-      expect(menu.find((m) => m.id === o.tray[0])!.kind).toBe('dish')
-      expect(o.hanzi.startsWith('我要')).toBe(true)
-      expect(o.pinyin.startsWith('wǒ yào')).toBe(true)
-    }
-  })
-  it('later levels use only their allowed kinds and give consistent trays', () => {
-    const rng = seeded(7)
-    for (let idx = 0; idx < CUSTOMERS; idx++) {
-      for (let n = 0; n < 30; n++) {
-        const o = generateOrder(menu, idx, rng)
-        expect(kindsFor(levelFor(idx))).toContain(o.kind)
-        for (const id of o.tray) if (id !== NO_SPICY_ID) expect(menu.some((m) => m.id === id)).toBe(true)
-        if (o.tray.includes(NO_SPICY_ID)) {
-          expect(o.pinyin).toContain('bù yào là')
-          expect(menu.find((m) => m.id === o.tray[0])!.spicy).toBe(true)
-        }
+describe('scripted levels', () => {
+  it('every level has 8 customers, valid ids, tone-marked pinyin, hanzi and a Swedish translation', () => {
+    for (let lv = 1; lv <= LEVELS; lv++) {
+      const orders = levelOrders(menu, lv, seeded(lv))
+      expect(orders).toHaveLength(CUSTOMERS)
+      for (const o of orders) {
+        expect(o.level).toBe(lv)
+        for (const id of o.tray) expect(byId.has(id) || WISH_IDS.includes(id), id).toBe(true)
+        expect(o.pinyin).toMatch(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/)
+        expect(o.pinyin).not.toMatch(/yí|bú/)
+        expect(o.hanzi.length).toBeGreaterThan(0)
+        expect(o.sv.length).toBeGreaterThan(3)
       }
     }
   })
-  it('is deterministic per seed', () => {
-    expect(generateOrder(menu, 3, seeded(3))).toEqual(generateOrder(menu, 3, seeded(3)))
+  it('level 1 is one dish; level 2 dish + drink; level 3 two dishes', () => {
+    for (const o of levelOrders(menu, 1)) {
+      expect(o.tray).toHaveLength(1)
+      expect(byId.get(o.tray[0])!.kind).toBe('dish')
+      expect(o.pinyin).toMatch(/^yī (fèn|wǎn) /)
+    }
+    for (const o of levelOrders(menu, 2)) {
+      expect(o.tray.map((id) => byId.get(id)!.kind).sort()).toEqual(['dish', 'drink'])
+    }
+    for (const o of levelOrders(menu, 3)) {
+      expect(o.tray).toHaveLength(2)
+      expect(o.tray.every((id) => byId.get(id)!.kind === 'dish')).toBe(true)
+    }
+  })
+  it('uses the course pinyin for course words and píng for beer', () => {
+    const beer = levelOrders(menu, 2).find((o) => o.tray.includes('pi-jiu'))!
+    expect(beer.pinyin).toContain('yī píng pí jiǔ')
+    const shuiOrder = levelOrders(menu, 2).find((o) => o.tray.includes('shui'))!
+    expect(shuiOrder.pinyin).toContain(course.words['shui'].pinyin)
+  })
+  it('wishes only make sense', () => {
+    const noSpicyOk = new Set(['jiao-zi', 'niu-rou-mian', 'mian-tiao'])
+    const noMeatOk = new Set(['chao-fan', 'bao-zi'])
+    for (const lv of [4, 5]) {
+      for (const o of levelOrders(menu, lv)) {
+        if (o.tray.includes(NO_SPICY_ID)) expect(o.tray.some((id) => noSpicyOk.has(id))).toBe(true)
+        if (o.tray.includes(NO_MEAT_ID) && o.special !== 'vegetarian') expect(o.tray.some((id) => noMeatOk.has(id))).toBe(true)
+        expect(o.tray).not.toEqual(expect.arrayContaining(['niu-rou-mian', NO_MEAT_ID]))
+        expect(o.tray).not.toEqual(expect.arrayContaining(['ji-dan', NO_MEAT_ID]))
+      }
+    }
+  })
+  it('level 4 has "liǎng bēi kā fēi" as a duplicate tray; level 5 has the 3-item order and the specials', () => {
+    const two = levelOrders(menu, 4).find((o) => o.pinyin === 'liǎng bēi kā fēi')!
+    expect(two.tray).toEqual(['ka-fei', 'ka-fei'])
+    expect(trayMatches(two, ['ka-fei', 'ka-fei'])).toBe(true)
+    expect(trayMatches(two, ['ka-fei'])).toBe(false)
+    const l5 = levelOrders(menu, 5)
+    expect(l5.some((o) => o.tray.length === 3 && o.pinyin.includes('chūn juǎn') && o.pinyin.includes('pí jiǔ'))).toBe(true)
+    expect(l5.some((o) => o.pinyin.startsWith('wǒ yào liǎng fèn bāo zi'))).toBe(true)
+    const change = l5.find((o) => o.special === 'change')!
+    expect(change.pinyin).toContain('bù duì!')
+    expect(change.prelude).toBeTruthy()
+    expect(change.tray).toEqual(expect.arrayContaining(['shou-si', 'lu-cha']))
+    const veg = l5.find((o) => o.special === 'vegetarian')!
+    expect(veg.prelude!.pinyin).toBe('yǒu sù de ma?')
+    expect(veg.tray.sort()).toEqual(['chun-juan', 'mi-fan', NO_MEAT_ID].sort())
+    const busy = levelOrders(menu, 4).find((o) => o.special === 'busy')!
+    expect(busy.patienceMul!).toBeLessThan(1)
+  })
+  it('shuffles the order within a level but is deterministic per seed', () => {
+    expect(levelOrders(menu, 3, seeded(3))).toEqual(levelOrders(menu, 3, seeded(3)))
+    expect(levelOrders(menu, 3, seeded(3)).map((o) => o.pinyin)).not.toEqual(levelOrders(menu, 3, seeded(4)).map((o) => o.pinyin))
   })
 })
 
@@ -79,18 +118,26 @@ describe('tray + counter', () => {
     expect(trayMatches(o, ['a', 'b'])).toBe(false)
     expect(trayMatches(o, ['a', 'b', 'b', 'c'])).toBe(false)
   })
-  it('counter has every needed card, unique, at the right size', () => {
+  it('500 random orders per level: every ordered item is on the counter, no duplicates, right size', () => {
     const rng = seeded(11)
-    for (let idx = 0; idx < CUSTOMERS; idx++) {
-      for (let n = 0; n < 20; n++) {
-        const o = generateOrder(menu, idx, rng)
+    for (let lv = 1; lv <= LEVELS; lv++) {
+      const pool = levelOrders(menu, lv, rng)
+      for (let n = 0; n < 500; n++) {
+        const o = pool[Math.floor(rng() * pool.length)]
         const cards = counterFor(o, menu, rng)
-        expect(cards).toHaveLength(gridSize(o.level))
-        expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length)
-        for (const id of o.tray) expect(cards.some((c) => c.id === id)).toBe(true)
-        expect(cards.some((c) => c.id === NO_SPICY_ID)).toBe(o.level >= 3)
+        const ids = cards.map((c) => c.id)
+        expect(cards).toHaveLength(gridSize(lv))
+        expect(new Set(ids).size).toBe(ids.length)
+        for (const id of o.tray) expect(ids, `${o.pinyin} needs ${id}`).toContain(id)
+        for (const id of o.decoys ?? []) expect(ids).toContain(id)
+        expect(ids.includes(NO_SPICY_ID)).toBe(lv >= 4)
+        expect(ids.includes(NO_MEAT_ID)).toBe(lv >= 4)
       }
     }
+  })
+  it('every menu item can be ordered: water is always on the counter when ordered', () => {
+    const o = levelOrders(menu, 2, seeded(5)).find((x) => x.tray.includes('shui'))!
+    for (let i = 0; i < 200; i++) expect(counterFor(o, menu, seeded(i)).some((c) => c.id === 'shui')).toBe(true)
   })
 })
 

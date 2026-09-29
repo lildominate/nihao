@@ -6,9 +6,9 @@ import { celebrate, CountUp, flyTo, haptic, replay } from '../../motion'
 import type { PandaMood } from '../../mascot/Panda'
 import { hasChineseVoice, PinyinText, playSfx, speak, stopSpeaking } from '../../speech'
 import { AudioSequencer, browserAudioDeps } from '../logic/audioQueue'
-import { NO_SPICY, NO_SPICY_ID, resolveMenu, type MenuItem } from '../logic/menu'
+import { NO_MEAT, NO_SPICY, resolveMenu, type MenuItem } from '../logic/menu'
 import {
-  counterFor, CUSTOMERS, finalBonus, generateOrder, levelFor, patienceMood, patienceMs, pinyinVisible, speciesFor, STARS, tipFor, trayKey, trayMatches, type Order, type Species,
+  counterFor, CUSTOMERS, finalBonus, LEVELS, levelOrders, patienceMood, patienceMs, pinyinVisible, PRELUDE_MS, SPECIES, STARS, tipFor, trayMatches, type Order, type Species,
 } from '../logic/restaurant'
 import { AnswerTracker, wordRef } from '../logic/session'
 import { floatText, GameFrame, useGameLoop, usePause, type GameProps, type Practised } from '../ui/kit'
@@ -41,15 +41,15 @@ interface Live {
   patienceLeft: number
   playMs: number
   countShown: number
-  lastKey: string | undefined
+  level: number
 }
 
-export function Restaurangrusch({ words, extra, weights, reduced, toneColors, onEnd, onExit }: GameProps) {
+export function Restaurangrusch({ words, extra, reduced, toneColors, onEnd, onExit }: GameProps) {
   const showHanzi = useProgress().state.settings.showHanzi
   const [paused, setPaused] = usePause()
   const [finished, setFinished] = useState(false)
   const menu = useMemo<MenuItem[]>(() => resolveMenu(new Map([...extra, ...words].map((w) => [w.id, w]))), [extra, words])
-  const byId = useMemo(() => new Map([...menu, NO_SPICY].map((m) => [m.id, m])), [menu])
+  const byId = useMemo(() => new Map([...menu, NO_SPICY, NO_MEAT].map((m) => [m.id, m])), [menu])
 
   const tracker = useRef(new AnswerTracker())
   const asked = useRef(new Map<string, MenuItem>())
@@ -58,7 +58,7 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
   const done = useRef(false)
   const live = useRef<Live>({
     phase: 'intro', t: COUNTDOWN_S, index: 0, stars: STARS, score: 0, streak: 0, bestStreak: 0, served: 0, tips: 0,
-    patienceTotal: 1, patienceLeft: 1, playMs: 0, countShown: 0, lastKey: undefined,
+    patienceTotal: 1, patienceLeft: 1, playMs: 0, countShown: 0, level: 1,
   })
 
   const [phase, setPhase] = useState<Phase>('intro')
@@ -70,7 +70,12 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
   const [tapped, setTapped] = useState(false)
   const [crowd, setCrowd] = useState<Guest[]>([])
   const [chefMood, setChefMood] = useState<PandaMood>('happy')
-  const [reveal, setReveal] = useState<{ ok: boolean; text: string; tip?: number } | null>(null)
+  const [reveal, setReveal] = useState<{ ok: boolean; text: string; sv: string; tip?: number } | null>(null)
+  /** Which line the bubble shows: 0 = prelude ("yǒu sù de ma?" / the order that gets corrected), 1 = the real order. */
+  const [stage, setStage] = useState<0 | 1>(1)
+  const [picked, setPicked] = useState(1)
+  /** After a serve the tray flashes each item's pinyin as learning feedback. */
+  const [flash, setFlash] = useState(false)
   const [key, setKey] = useState(0)
 
   const stageRef = useRef<HTMLDivElement>(null)
@@ -89,6 +94,8 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
   const orderRef = useRef<Order | null>(null)
   const moodRef = useRef<Mood>('happy')
   const guestId = useRef(0)
+  const queue = useRef<Order[]>([])
+  const stageRef2 = useRef<0 | 1>(1)
   const timers = useRef<number[]>([])
 
   useEffect(() => {
@@ -131,16 +138,15 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
 
   const nextCustomer = (index: number) => {
     const L = live.current
-    const o = generateOrder(menu, index, Math.random, weights, L.lastKey)
-    L.lastKey = trayKey(o.tray)
+    const o = queue.current[index]
     L.index = index
-    L.patienceTotal = patienceMs(o.level, o.tray.length)
+    L.patienceTotal = patienceMs(o.level, o.tray.length) * (o.patienceMul ?? 1) + (o.prelude ? PRELUDE_MS : 0)
     L.patienceLeft = L.patienceTotal
     orderRef.current = o
     const id = ++guestId.current
     moodRef.current = 'happy'
     // The previous guest keeps walking out (same element, same animation) while the new one walks in.
-    setCrowd((c) => [...c, { id, sp: speciesFor(index), mood: 'happy' }])
+    setCrowd((c) => [...c, { id, sp: SPECIES[Math.floor(Math.random() * SPECIES.length)], mood: 'happy' }])
     later(() => setCrowd((c) => c.filter((g) => g.id === guestId.current)), 1700)
     setOrder(o)
     setCards(counterFor(o, menu))
@@ -148,13 +154,19 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
     trayRef.current?.classList.remove('rs-slide')
     setTapped(false)
     setReveal(null)
+    setFlash(false)
+    stageRef2.current = o.prelude ? 0 : 1
+    setStage(stageRef2.current)
     setChefMood('happy')
     setKey((k) => k + 1)
     setHud((h) => ({ ...h, n: index + 1 }))
     if (barRef.current) { barRef.current.style.transform = 'scaleX(1)'; barRef.current.dataset.mood = 'happy' }
     for (const tid of o.tray) { const m = byId.get(tid); if (m?.wordId) asked.current.set(m.wordId, m) }
     go('order')
-    void seq.current.replay(o.hanzi)
+    if (o.prelude) {
+      void seq.current.replay(o.prelude.hanzi)
+      later(() => { stageRef2.current = 1; setStage(1); if (live.current.phase === 'order' && orderRef.current === o) void seq.current.replay(o.hanzi) }, PRELUDE_MS)
+    } else void seq.current.replay(o.hanzi)
   }
 
   const resolve = (ok: boolean, timeout: boolean) => {
@@ -165,6 +177,9 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
     const rect = custRef.current?.getBoundingClientRect()
     const layer = layerRef.current?.getBoundingClientRect()
     const gid = guestId.current
+    stageRef2.current = 1
+    setStage(1)
+    setFlash(true)
     if (!reduced) {
       if (serveRef.current) replay(serveRef.current, 'rs-serve')
       if (trayRef.current) replay(trayRef.current, 'rs-slide')
@@ -181,7 +196,7 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
       setChefMood('cheer')
       playSfx('correct')
       haptic('success')
-      setReveal({ ok: true, text: 'Tack så mycket!', tip })
+      setReveal({ ok: true, text: 'Tack så mycket!', sv: o.sv, tip })
       const total = L.score
       setHud((h) => ({ ...h, done: h.done + 1 }))
       if (rect) celebrate('burst', { origin: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 3 }, intensity: 0.8 })
@@ -199,7 +214,7 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
       setChefMood('sad')
       playSfx('wrong')
       haptic('error')
-      setReveal({ ok: false, text: `${timeout ? 'För långsamt! ' : ''}Han ville ha: ${o.sv.replace(/^Jag vill ha |^Snälla, ge mig /, '')}` })
+      setReveal({ ok: false, text: `${timeout ? 'För långsamt! ' : ''}Han ville ha:`, sv: o.sv })
       setHud((h) => ({ ...h, stars: L.stars, done: h.done + 1 }))
       if (stageRef.current && !reduced) replay(stageRef.current, 'shake')
       L.t = LEAVE_WRONG_MS / 1000
@@ -286,25 +301,29 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
   }
   const serve = () => {
     const o = orderRef.current
-    if (!o || live.current.phase !== 'order' || pausedRef.current || trayIdsRef.current.length === 0) return
+    if (!o || live.current.phase !== 'order' || pausedRef.current || stageRef2.current === 0 || trayIdsRef.current.length === 0) return
     resolve(trayMatches(o, trayIdsRef.current), false)
   }
   const listen = () => {
     if (live.current.phase !== 'order' || !orderRef.current) return
     setTapped(true)
     haptic('light')
-    void seq.current.replay(orderRef.current.hanzi)
+    const o = orderRef.current
+    void seq.current.replay(stageRef2.current === 0 && o.prelude ? o.prelude.hanzi : o.hanzi)
   }
   const start = () => {
     playSfx('tap')
+    live.current.level = picked
+    queue.current = levelOrders(menu, picked)
     live.current.t = COUNTDOWN_S
     live.current.countShown = COUNTDOWN_S
     setCount(COUNTDOWN_S)
     go('countdown')
   }
 
+  const line = order && stage === 0 && order.prelude ? order.prelude : order
   const showPinyin = order ? pinyinVisible(order.level, tapped) : false
-  const level = order?.level ?? levelFor(0)
+  const level = order?.level ?? picked
   const active = phase === 'order'
 
   const hudNode = (
@@ -343,7 +362,10 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
                 const m = byId.get(id)!
                 return (
                   <button key={`${id}${i}`} type="button" onClick={() => removeAt(i)} aria-label={`Ta bort ${m.sv}`}
-                    className="rs-land press flex h-11 w-10 items-center justify-center text-[30px] leading-none drop-shadow">{m.emoji}</button>
+                    className="rs-land press relative flex h-11 w-10 items-center justify-center text-[30px] leading-none drop-shadow">
+                    {m.emoji}
+                    {flash && <span data-testid="rr-tray-pinyin" className={`pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-surface/95 px-1 text-[9px] leading-tight font-black text-ink shadow ${i % 2 ? '-top-7' : '-top-3'}`}>{m.pinyin}</span>}
+                  </button>
                 )
               })}
             </div>
@@ -376,9 +398,9 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
                 <div className="min-w-0 flex-1">
                   {/* The learner studies pinyin, not characters: pinyin is the big line; hanzi only with "Visa tecken". */}
                   {showPinyin
-                    ? <PinyinText pinyin={order.pinyin} colored={toneColors} className="text-xl leading-tight font-black" />
+                    ? <PinyinText pinyin={line!.pinyin} colored={toneColors} className="text-xl leading-tight font-black" />
                     : <div className="text-base font-black text-ink-muted">Tryck 🔊 och lyssna</div>}
-                  {showHanzi && <div className="text-xs font-bold text-ink-muted" lang="zh-CN">{order.hanzi}</div>}
+                  {showHanzi && <div className="text-xs font-bold text-ink-muted" lang="zh-CN">{line!.hanzi}</div>}
                 </div>
                 <button type="button" aria-label="Lyssna igen" data-testid="rr-listen" onClick={listen} disabled={!active}
                   className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-soft text-2xl active:scale-95">🔊</button>
@@ -390,20 +412,20 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
           {reveal && (
             <div key={`r${key}`} className={`absolute bottom-[30px] left-2 z-[18] max-w-[240px] rounded-xl px-3 py-1.5 text-sm font-black shadow-lg ${reveal.ok ? 'bg-brand-soft text-brand-dark' : 'bg-danger-soft text-danger-dark'} ${reduced ? '' : 'g-pop'}`} data-testid="rr-reveal">
               {reveal.text}{reveal.tip ? ` +${reveal.tip} 🪙` : ''}
+              <div className="text-xs font-bold opacity-90">{reveal.sv}</div>
             </div>
           )}
         </div>
 
         {/* Dish shelf */}
         <div className="border-t-4 border-warn-dark bg-surface-3 px-2 pt-2">
-          <div className="grid gap-1.5" data-testid="rr-grid" style={{ gridTemplateColumns: level >= 3 ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))' }}>
+          <div className="grid gap-1.5" data-testid="rr-grid" style={{ gridTemplateColumns: level >= 4 ? 'repeat(4, minmax(0, 1fr))' : 'repeat(3, minmax(0, 1fr))' }}>
             {cards.map((m) => (
               <button key={m.id} type="button" disabled={!active} data-testid={`rr-card-${m.id}`} data-dish={m.id}
                 onClick={(e) => addCard(m, e.currentTarget.querySelector('[data-emoji]'))}
                 className="press flex min-h-[84px] flex-col items-center justify-center gap-0.5 rounded-2xl border-2 border-b-4 border-line-dark bg-surface px-0.5 py-1 text-center active:translate-y-0.5 active:border-b-2 disabled:opacity-70">
                 <DishPlate emoji={m.emoji}>
-                  <span className="text-[11px] leading-tight font-extrabold">{m.id === NO_SPICY_ID ? 'Inte stark' : m.sv}</span>
-                  {showPinyin && <PinyinText pinyin={m.pinyin} colored={toneColors} className="text-[10px] leading-tight font-bold text-ink-muted" />}
+                  <span className="text-[11px] leading-tight font-extrabold">{m.sv}</span>
                 </DishPlate>
               </button>
             ))}
@@ -425,10 +447,16 @@ export function Restaurangrusch({ words, extra, weights, reduced, toneColors, on
                 <li>1. En kund kommer in och beställer på kinesiska. Lyssna och läs.</li>
                 <li>2. Tryck på rätterna så flyger de till brickan (tryck på en rätt på brickan för att ta bort den).</li>
                 <li>3. Tryck <b>Servera!</b> innan tålamodet tar slut.</li>
-                <li>4. Fel eller för långsam = en ⭐ mindre. Klara {CUSTOMERS} kunder!</li>
+                <li>4. Fel eller för långsam = en ⭐ mindre. Klara {CUSTOMERS} kunder på nivån. Rätterna visas utan pinyin, så du måste förstå beställningen.</li>
               </ol>
+              <div className="mt-3 flex justify-center gap-1.5" role="radiogroup" aria-label="Nivå">
+                {Array.from({ length: LEVELS }, (_, i) => i + 1).map((n) => (
+                  <button key={n} type="button" role="radio" aria-checked={picked === n} data-testid={`rr-level-${n}`} onClick={() => setPicked(n)}
+                    className={`press h-11 w-11 rounded-2xl border-2 border-b-4 text-lg font-black ${picked === n ? 'border-brand-dark bg-brand text-white' : 'border-line-dark bg-surface text-ink'}`}>{n}</button>
+                ))}
+              </div>
               <button type="button" onClick={start} data-testid="rr-start"
-                className="press mt-4 w-full rounded-2xl border-b-4 border-brand-dark bg-brand py-3.5 text-lg font-black text-white active:translate-y-0.5 active:border-b-2">
+                className="press mt-3 w-full rounded-2xl border-b-4 border-brand-dark bg-brand py-3.5 text-lg font-black text-white active:translate-y-0.5 active:border-b-2">
                 Öppna köket
               </button>
             </div>

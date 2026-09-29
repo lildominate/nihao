@@ -1,125 +1,143 @@
-// OWNER: Games agent. Restaurangrusch logic (pure): order generation, tray check, patience, scoring.
-import { NO_SPICY, NO_SPICY_ID, type MenuItem } from './menu'
+// OWNER: Games agent. Restaurangrusch logic (pure): scripted levels, tray check, counter, patience, scoring.
+import { MEASURE_SV, MEASURE_ZH, NO_MEAT, NO_SPICY, WISH_IDS, type MenuItem } from './menu'
 import { shuffle, type Rng } from './random'
-import type { Weights } from './weighting'
 
 export const CUSTOMERS = 8
+export const LEVELS = 5
 export const STARS = 3
 export const GRID_SIZE = 6
-export const GRID_SIZE_LATE = 8
+/** Levels 4-5 also put the two wish cards on the counter. */
+export const GRID_SIZE_WISH = 8
 /** Pinyin is visible from the start on levels 1..PINYIN_FREE_LEVELS; later it needs a tap on the speaker. */
 export const PINYIN_FREE_LEVELS = 2
+/** How long a prelude line ("yǒu sù de ma?", the first order that gets corrected) stays up before the real order. */
+export const PRELUDE_MS = 2200
 
-export type OrderKind = 'one' | 'portion' | 'pair' | 'two-dishes' | 'no-spicy' | 'no-spicy-drink' | 'two-drinks'
+export type Special = 'busy' | 'change' | 'vegetarian'
+
+export interface Line { hanzi: string; pinyin: string; sv: string }
 
 export interface Order {
-  kind: OrderKind
   level: number
-  /** Tray the player must build (multiset of menu ids; NO_SPICY_ID for the "no chili" card). */
+  special?: Special
+  /** Tray the player must build (multiset of menu ids; wish ids for the "no chili" / "no meat" cards). */
   tray: string[]
   hanzi: string
   pinyin: string
-  /** Swedish gloss, shown after a mistake. */
+  /** Swedish translation, shown after the serve. */
   sv: string
-}
-
-/** Levels 1-4: two customers each. */
-export function levelFor(index: number): number {
-  return Math.min(4, 1 + Math.floor(Math.max(0, index) / 2))
+  /** Shown/spoken first; after PRELUDE_MS the bubble switches to hanzi/pinyin. */
+  prelude?: Line
+  /** Patience multiplier (stressed customers < 1). */
+  patienceMul?: number
+  /** Extra items that must be on the counter (e.g. what the customer first asked for). */
+  decoys?: string[]
 }
 
 /** Patience budget in ms: shorter each level, longer for bigger orders. */
 export function patienceMs(level: number, trayLen: number): number {
-  const base = Math.max(9000, 20000 - 3000 * (level - 1))
+  const base = Math.max(9000, 20000 - 2500 * (level - 1))
   return base + 2500 * Math.max(0, trayLen - 1)
 }
 
 export function gridSize(level: number): number {
-  return level >= 3 ? GRID_SIZE_LATE : GRID_SIZE
+  return level >= 4 ? GRID_SIZE_WISH : GRID_SIZE
 }
 
 export function pinyinVisible(level: number, tapped: boolean): boolean {
   return level <= PINYIN_FREE_LEVELS || tapped
 }
 
-function pickWeighted<T extends MenuItem>(list: readonly T[], weights: Weights | undefined, rng: Rng): T {
-  const w = list.map((m) => Math.max(0.05, (m.wordId && weights?.[m.wordId]) || 1))
-  let r = rng() * w.reduce((a, b) => a + b, 0)
-  for (let i = 0; i < list.length; i++) { r -= w[i]; if (r <= 0) return list[i] }
-  return list[list.length - 1]
-}
+// ─── Scripted levels ─────────────────────────────────────────
 
-function pickN<T extends MenuItem>(list: readonly T[], n: number, weights: Weights | undefined, rng: Rng): T[] {
-  const left = [...list]
-  const out: T[] = []
-  while (out.length < n && left.length) {
-    const p = pickWeighted(left, weights, rng)
-    out.push(p)
-    left.splice(left.indexOf(p), 1)
-  }
-  return out
-}
+interface Bit { py: string; zh: string; sv: string; ids: string[] }
+interface Text { py: string; zh: string; sv: string }
 
-const join = (parts: string[]) => parts.join(' ')
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 
-/** Kinds allowed at a level (level 1: one dish only). */
-export function kindsFor(level: number): OrderKind[] {
-  if (level <= 1) return ['one']
-  if (level === 2) return ['one', 'portion', 'pair']
-  if (level === 3) return ['pair', 'two-dishes', 'no-spicy', 'portion']
-  return ['pair', 'two-dishes', 'no-spicy', 'no-spicy-drink', 'two-drinks']
-}
-
-/** Builds one customer's order. `avoid` = the previous order's trayKey, so it is not repeated back to back. */
-export function generateOrder(menu: readonly MenuItem[], index: number, rng: Rng = Math.random, weights?: Weights, avoid?: string): Order {
-  const level = levelFor(index)
-  const dishes = menu.filter((m) => m.kind === 'dish')
-  const drinks = menu.filter((m) => m.kind === 'drink')
-  const spicy = dishes.filter((m) => m.spicy)
-  const kinds = kindsFor(level)
-  let order: Order | null = null
-  for (let attempt = 0; attempt < 8; attempt++) {
-    const kind = kinds[Math.floor(rng() * kinds.length)]
-    order = build(kind, level, dishes, drinks, spicy, weights, rng)
-    if (!avoid || trayKey(order.tray) !== avoid) break
-  }
-  return order!
-}
-
-function build(kind: OrderKind, level: number, dishes: MenuItem[], drinks: MenuItem[], spicy: MenuItem[], weights: Weights | undefined, rng: Rng): Order {
-  const mk = (tray: string[], hanzi: string, pinyin: string, sv: string): Order => ({ kind, level, tray, hanzi, pinyin, sv })
-  switch (kind) {
-    case 'one': {
-      const d = pickWeighted(level === 1 ? dishes : [...dishes, ...drinks], weights, rng)
-      return mk([d.id], `我要${d.hanzi}`, join(['wǒ yào', d.pinyin]), `Jag vill ha ${d.sv}`)
-    }
-    case 'portion': {
-      const d = pickWeighted(dishes, weights, rng)
-      return mk([d.id], `我要一份${d.hanzi}`, join(['wǒ yào yī fèn', d.pinyin]), `Jag vill ha en portion ${d.sv}`)
-    }
-    case 'pair': {
-      const a = pickWeighted(dishes, weights, rng)
-      const b = pickWeighted(drinks, weights, rng)
-      return mk([a.id, b.id], `我要${a.hanzi}和${b.hanzi}`, join(['wǒ yào', a.pinyin, 'hé', b.pinyin]), `Jag vill ha ${a.sv} och ${b.sv}`)
-    }
-    case 'two-dishes': {
-      const [a, b] = pickN(dishes, 2, weights, rng)
-      return mk([a.id, b.id], `我要${a.hanzi}和${b.hanzi}`, join(['wǒ yào', a.pinyin, 'hé', b.pinyin]), `Jag vill ha ${a.sv} och ${b.sv}`)
-    }
-    case 'no-spicy': {
-      const d = pickWeighted(spicy.length ? spicy : dishes, weights, rng)
-      return mk([d.id, NO_SPICY_ID], `我要${d.hanzi}，不要辣`, `${join(['wǒ yào', d.pinyin])}, ${NO_SPICY.pinyin}`, `Jag vill ha ${d.sv}, inte stark`)
-    }
-    case 'no-spicy-drink': {
-      const d = pickWeighted(spicy.length ? spicy : dishes, weights, rng)
-      const k = pickWeighted(drinks, weights, rng)
-      return mk([d.id, k.id, NO_SPICY_ID], `我要${d.hanzi}和${k.hanzi}，不要辣`, `${join(['wǒ yào', d.pinyin, 'hé', k.pinyin])}, ${NO_SPICY.pinyin}`, `Jag vill ha ${d.sv} och ${k.sv}, inte stark`)
-    }
-    case 'two-drinks': {
-      const k = pickWeighted(drinks, weights, rng)
-      return mk([k.id, k.id], `请给我两杯${k.hanzi}`, join(['qǐng gěi wǒ liǎng bēi', k.pinyin]), `Snälla, ge mig två ${k.sv}`)
+/** Builds one level's 8 customers from the (course-resolved) menu. Order within the level is shuffled. */
+export function levelOrders(menu: readonly MenuItem[], level: number, rng: Rng = Math.random): Order[] {
+  const by = new Map(menu.map((m) => [m.id, m]))
+  const get = (id: string) => { const m = by.get(id); if (!m) throw new Error(`menu item ${id}`); return m }
+  /** Counted: "yī fèn jiǎo zi" / "liǎng bēi kā fēi". */
+  const n = (id: string, count = 1): Bit => {
+    const m = get(id)
+    const [one, many] = MEASURE_SV[m.mw]
+    return {
+      py: `${count === 1 ? 'yī' : 'liǎng'} ${m.mw} ${m.pinyin}`,
+      zh: `${count === 1 ? '一' : '两'}${MEASURE_ZH[m.mw]}${m.hanzi}`,
+      sv: count === 1 ? `${one} ${m.sv}` : `två ${many} ${m.sv}`,
+      ids: Array<string>(count).fill(id),
     }
   }
+  /** Bare word: "jiǎo zi". */
+  const w = (id: string): Bit => { const m = get(id); return { py: m.pinyin, zh: m.hanzi, sv: m.sv, ids: [id] } }
+  const wish = (m: MenuItem): Bit => ({ py: m.pinyin, zh: m.hanzi, sv: m.sv, ids: [m.id] })
+  const NS = wish(NO_SPICY)
+  const NM = wish(NO_MEAT)
+  const comma = (bits: Bit[]): Text => ({ py: bits.map((b) => b.py).join(', '), zh: bits.map((b) => b.zh).join('，'), sv: cap(bits.map((b) => b.sv).join(', ')) })
+  const and = (bits: Bit[]): Text => ({ py: bits.map((b) => b.py).join(' hé '), zh: bits.map((b) => b.zh).join('和'), sv: bits.map((b) => b.sv).join(' och ') })
+  const mk = (bits: Bit[], t: Text, extra: Partial<Order> = {}): Order =>
+    ({ level, tray: bits.flatMap((b) => b.ids), hanzi: t.zh, pinyin: t.py, sv: t.sv, ...extra })
+  const list = (...bits: Bit[]) => mk(bits, comma(bits))
+  const say = (prefix: Text, bits: Bit[]) => {
+    const t = and(bits)
+    return mk(bits, { py: `${prefix.py} ${t.py}`, zh: `${prefix.zh}${t.zh}`, sv: `${prefix.sv} ${t.sv}` })
+  }
+  const wantP: Text = { py: 'wǒ yào', zh: '我要', sv: 'Jag vill ha' }
+  const giveP: Text = { py: 'qǐng gěi wǒ', zh: '请给我', sv: 'Snälla, ge mig' }
+  const comeP: Text = { py: 'qǐng lái', zh: '请来', sv: 'Kan jag få' }
+  const rush = (): Order => mk([n('niu-rou-mian'), n('ka-fei')], {
+    py: 'kuài yī diǎn, yī wǎn niú ròu miàn, yī bēi kā fēi', zh: '快一点，一碗牛肉面，一杯咖啡', sv: 'Skynda på! En skål nötköttsnudlar och ett glas kaffe',
+  }, { special: 'busy', patienceMul: 0.6 })
+
+  let orders: Order[]
+  switch (level) {
+    case 1:
+      orders = ['jiao-zi', 'mi-fan', 'shou-si', 'tang', 'bao-zi', 'mian-tiao', 'chun-juan', 'ji-dan'].map((id) => list(n(id)))
+      break
+    case 2:
+      orders = [
+        ['jiao-zi', 'cha'], ['niu-rou-mian', 'shui'], ['shou-si', 'lu-cha'], ['chao-fan', 'ka-fei'],
+        ['xiao-long-bao', 'nai-cha'], ['tang', 'pi-jiu'], ['chun-juan', 'cha'], ['bao-zi', 'shui'],
+      ].map(([a, b]) => list(n(a), n(b)))
+      break
+    case 3:
+      orders = [
+        ['jiao-zi', 'mi-fan'], ['niu-rou-mian', 'chun-juan'], ['shou-si', 'tang'], ['chao-fan', 'ji-dan'],
+        ['xiao-long-bao', 'mian-tiao'], ['bao-zi', 'yu'], ['tang', 'jiao-zi'], ['chun-juan', 'mi-fan'],
+      ].map(([a, b]) => say(wantP, [w(a), w(b)]))
+      break
+    case 4:
+      orders = [
+        list(n('jiao-zi'), NS),
+        list(n('niu-rou-mian'), NS),
+        list(n('chao-fan'), NM),
+        list(n('bao-zi'), NM),
+        list(n('ka-fei', 2)),
+        list(n('mian-tiao'), NS, n('cha')),
+        rush(),
+        list(n('jiao-zi'), NS, n('shui')),
+      ]
+      break
+    default: {
+      const first = comma([n('jiao-zi'), n('ka-fei')])
+      const second = comma([n('shou-si'), n('lu-cha')])
+      const change = mk([n('shou-si'), n('lu-cha')], { py: `bù duì! ${second.py}`, zh: `不对！${second.zh}`, sv: `Nej, fel! ${second.sv}` },
+        { special: 'change', prelude: { pinyin: first.py, hanzi: first.zh, sv: first.sv }, decoys: ['jiao-zi', 'ka-fei'] })
+      const veg = mk([w('chun-juan'), w('mi-fan'), NM], { py: 'wǒ yào chūn juǎn hé mǐ fàn, bù yào ròu', zh: '我要春卷和米饭，不要肉', sv: 'Jag vill ha vårrulle och ris, utan kött' },
+        { special: 'vegetarian', prelude: { pinyin: 'yǒu sù de ma?', hanzi: '有素的吗？', sv: 'Finns det något vegetariskt?' } })
+      orders = [
+        say(giveP, [n('jiao-zi'), n('cha')]),
+        say(wantP, [n('niu-rou-mian')]),
+        say(comeP, [n('ka-fei')]),
+        say(wantP, [n('bao-zi', 2)]),
+        say(giveP, [w('chun-juan'), w('yu'), w('pi-jiu')]),
+        rush(), change, veg,
+      ]
+    }
+  }
+  return shuffle(orders, rng)
 }
 
 export const trayKey = (tray: readonly string[]) => [...tray].sort().join('|')
@@ -130,21 +148,23 @@ export function trayMatches(order: Pick<Order, 'tray'>, tray: readonly string[])
 }
 
 /**
- * The cards on the counter: everything the order needs (unique) padded with distractors, shuffled.
- * From level 3 the "bù yào là" card is always on the counter (ordered or not) so it never gives the answer away.
+ * The cards on the counter: every item of the order (one card each - duplicates come from tapping twice),
+ * padded with distractors, shuffled. Levels 4-5 always add both wish cards last, so they never give the answer away.
+ * The UI shows no pinyin on the cards: the player has to understand the order.
  */
 export function counterFor(order: Order, menu: readonly MenuItem[], rng: Rng = Math.random): MenuItem[] {
   const size = gridSize(order.level)
+  const wishes = order.level >= 4
   const byId = new Map(menu.map((m) => [m.id, m]))
-  const cards = [...new Set(order.tray)].filter((id) => id !== NO_SPICY_ID).map((id) => byId.get(id)!).filter(Boolean)
-  const withMod = order.level >= 3
-  const wanted = withMod ? size - 1 : size
-  for (const m of shuffle(menu.filter((x) => !cards.some((c) => c.id === x.id)), rng)) {
+  const wanted = wishes ? size - WISH_IDS.length : size
+  const need = [...new Set([...order.tray, ...(order.decoys ?? [])])].filter((id) => !WISH_IDS.includes(id))
+  const cards = need.map((id) => byId.get(id)!).filter(Boolean)
+  for (const m of shuffle(menu.filter((x) => !need.includes(x.id) && !WISH_IDS.includes(x.id)), rng)) {
     if (cards.length >= wanted) break
     cards.push(m)
   }
   const out = shuffle(cards, rng)
-  if (withMod) out.push(NO_SPICY)
+  if (wishes) out.push(NO_SPICY, NO_MEAT)
   return out
 }
 
