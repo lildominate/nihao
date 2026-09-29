@@ -67,7 +67,7 @@ describe('course structure', () => {
     for (const [k, s] of Object.entries(course.sentences)) expect(s.id, k).toBe(k)
   })
 
-  it('introduces every word in exactly one lesson', () => {
+  it('introduces every word in exactly one lesson (theme words may be theme-only)', () => {
     const seen = new Map<string, string>()
     for (const l of lessons) {
       for (const id of l.newWords) {
@@ -76,7 +76,9 @@ describe('course structure', () => {
         expect(course.words[id], `${l.id}: unknown word ${id}`).toBeDefined()
       }
     }
-    for (const id of Object.keys(course.words)) expect(seen.has(id), `${id} never introduced`).toBe(true)
+    const themeWordIds = new Set((course.themes ?? []).flatMap((t) => t.words))
+    for (const id of Object.keys(course.words))
+      expect(seen.has(id) || themeWordIds.has(id), `${id} neither introduced in a lesson nor a theme word`).toBe(true)
   })
 
   it('references only existing sentences, each exactly once', () => {
@@ -209,6 +211,36 @@ describe('pinyin & hanzi', () => {
       }
     }
     expect(mismatches, mismatches.join('\n')).toEqual([])
+  })
+})
+
+describe('themes', () => {
+  const themes = course.themes ?? []
+
+  it('has the four picture themes', () => {
+    expect(themes.map((t) => t.id)).toEqual(['t-food', 't-vehicles', 't-animals', 't-home'])
+    for (const t of themes) expect(t.title.trim() && t.emoji, t.id).toBeTruthy()
+  })
+
+  it('has 16–28 words per theme, no duplicates, all existing with an emoji', () => {
+    for (const t of themes) {
+      expect(t.words.length, t.id).toBeGreaterThanOrEqual(16)
+      expect(t.words.length, t.id).toBeLessThanOrEqual(28)
+      expect(new Set(t.words).size, `${t.id} has duplicate words`).toBe(t.words.length)
+      for (const id of t.words) {
+        const w = course.words[id]
+        expect(w, `${t.id}: unknown word ${id}`).toBeDefined()
+        expect(w.emoji?.trim(), `${id} has no emoji`).toBeTruthy()
+        expect([...new Intl.Segmenter().segment(w.emoji!)].length, `${id} emoji must be a single emoji`).toBe(1)
+      }
+    }
+  })
+
+  it('has no two words with the same hanzi inside a theme', () => {
+    for (const t of themes) {
+      const hanzi = t.words.map((id) => course.words[id].hanzi)
+      expect(new Set(hanzi).size, t.id).toBe(hanzi.length)
+    }
   })
 })
 

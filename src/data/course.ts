@@ -18,5 +18,6 @@ import { u12 } from './units/u12'
 import { u13 } from './units/u13'
 import { u14 } from './units/u14'
 import { u15 } from './units/u15'
+import { applyThemes } from './themes'
 
-export const course: Course = buildCourse([u01, u02, u03, u04, u05, u06, u07, u08, u09, u10, u11, u12, u13, u14, u15])
+export const course: Course = applyThemes(buildCourse([u01, u02, u03, u04, u05, u06, u07, u08, u09, u10, u11, u12, u13, u14, u15]))

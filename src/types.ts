@@ -26,6 +26,8 @@ export interface Word {
   en?: string
   pos?: 'noun' | 'verb' | 'adj' | 'adv' | 'pron' | 'num' | 'measure' | 'particle' | 'phrase' | 'other'
   note?: string         // short Swedish note shown on intro card
+  emoji?: string        // v3: picture for theme games (single emoji)
+  image?: string        // v3: optional illustration path (e.g. "pics/food/fish.webp" under public/); shown instead of emoji when present
 }
 
 export interface Sentence {
@@ -65,6 +67,19 @@ export interface Course {
   sentences: Record<string, Sentence>
   /** v2: short conversations / stories. Optional so v1 fixtures still type-check. */
   dialogues?: Record<string, Dialogue>
+  /** v3: picture themes (Mat, Fordon, Djur, Hemma…) — always available, outside the linear path. */
+  themes?: Theme[]
+}
+
+/**
+ * v3 picture theme. Its words live in course.words (with `emoji`); a word may belong to a theme
+ * without being introduced in any lesson. Theme lessons are generated from `words` in chunks.
+ */
+export interface Theme {
+  id: string            // e.g. "t-food"
+  title: string         // Swedish, e.g. "Mat & dryck"
+  emoji: string
+  words: string[]       // word ids, easiest first; every word must have an emoji
 }
 
 // ─── v2: dialogues & stories (comprehensible input) ──────────
