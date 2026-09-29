@@ -1,4 +1,5 @@
 // OWNER: Games agent. "Spelhallen" — mini-games on learned words. Entry = contract.
+import { THEME_GAME_ENTRY } from '../themes'
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import type { LessonResult, Word } from '../types'
 import { course } from '../data/course'
@@ -187,6 +188,7 @@ export function GamesHub() {
   const canBuild = useMemo(() => sentencesFor(pool.words.map((w) => w.id)).length > 0, [pool])
   const [records, setRecords] = useState<Records>(() => loadRecords())
   const [active, setActive] = useState<{ def: GameDef; words: Word[] } | null>(null)
+  const [themeGame, setThemeGame] = useState(false)
 
   const open = (def: GameDef) => {
     playSfx('tap')
@@ -195,6 +197,7 @@ export function GamesHub() {
 
   if (active) {
     return <GameSession def={active.def} words={active.words} onRecords={setRecords} onClose={() => setActive(null)} />
+  if (themeGame) return <THEME_GAME_ENTRY.Component onExit={() => setThemeGame(false)} />
   }
 
   return (
@@ -239,6 +242,17 @@ export function GamesHub() {
             </button>
           )
         })}
+        {/* Picture themes game (src/themes): picks a theme, then "Vad är det här?". */}
+        <button type="button" onClick={() => setThemeGame(true)}
+          className={`press g-in relative flex min-h-32 items-stretch overflow-hidden rounded-3xl bg-gradient-to-br ${THEME_GAME_ENTRY.gradient} ${THEME_GAME_ENTRY.shadow} p-4 text-left text-white transition-transform active:translate-y-1 active:shadow-none`}>
+          <div className="pointer-events-none absolute -right-6 -bottom-8 h-32 w-32 rounded-full bg-white/10" />
+          <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+            <div className="text-2xl font-black drop-shadow-sm">{THEME_GAME_ENTRY.title}</div>
+            <div className="mt-0.5 text-[15px] leading-snug font-bold text-white/90">{THEME_GAME_ENTRY.tagline}</div>
+            <div className="mt-auto pt-3"><span className="rounded-full bg-black/20 px-3 py-1 text-sm font-black">Mat · Fordon · Djur · Hemma</span></div>
+          </div>
+          <div className="relative z-10 grid h-24 w-24 shrink-0 place-items-center self-center text-6xl">{THEME_GAME_ENTRY.emoji}</div>
+        </button>
       </div>
     </div>
   )

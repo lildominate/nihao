@@ -27,11 +27,13 @@ type Selected =
   | { type: 'lesson'; lesson: Lesson; unit: Unit; unitIndex: number; lessonIndex: number; status: LessonStatus }
   | { type: 'dialogue'; dialogue: Dialogue; unitIndex: number; locked: boolean }
 
-export function LearnScreen({ onStartLesson, onStartDialogue, top }: {
+export function LearnScreen({ onStartLesson, onStartDialogue, top, below }: {
   onStartLesson: (lesson: Lesson, unitIndex: number) => void
   onStartDialogue: (dialogue: Dialogue) => void
   /** Extra card at the top of the home screen (Dagens pass). */
   top?: React.ReactNode
+  /** Extra section under the daily quests (Teman). */
+  below?: React.ReactNode
 }) {
   const { lessonStatus } = useProgress()
   const [selected, setSelected] = useState<Selected | null>(null)
@@ -69,6 +71,7 @@ export function LearnScreen({ onStartLesson, onStartDialogue, top }: {
             {top}
             <ContinueCard current={current} onStart={() => current && onStartLesson(current.lesson, current.unitIndex)} />
             <DailyQuestsCard />
+            {below}
           </div>
 
           {course.units.map((unit, ui) => (

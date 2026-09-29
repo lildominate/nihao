@@ -14,6 +14,7 @@ import { DailyCard, DayBetween } from './daily/DailyCard'
 import { loadDay, planDay, saveDay } from './daily/plan'
 import type { Craving, DayRecord, Energy, StepKind } from './daily/plan'
 import { VideoCourse } from './videos/VideoCourse'
+import { ThemesSection } from './themes'
 import { SongLesson, SONGS } from './songs/SongLesson'
 import { seenDialogues } from './app/util'
 import { setTapSound, Splash, Transition } from './motion'
@@ -172,7 +173,7 @@ export default function App() {
       <div className="mx-auto min-h-dvh max-w-md px-safe pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:border-x sm:border-line/70">
         <main>
           <Transition swapKey={tab} kind="fade">
-            {tab === 'learn' && <LearnScreen onStartLesson={startLesson} onStartDialogue={setDialogue} top={<DailyCard today={day} onStart={startDay} />} />}
+            {tab === 'learn' && <LearnScreen onStartLesson={startLesson} onStartDialogue={setDialogue} top={<DailyCard today={day} onStart={startDay} />} below={<ThemesSection onStartLesson={setSession} />} />}
             {tab === 'practice' && <ReviewScreen onStart={setSession} />}
             {tab === 'games' && <GamesHub />}
             {tab === 'words' && <WordsScreen />}
